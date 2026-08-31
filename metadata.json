@@ -1,0 +1,6 @@
+{
+  "name": "Visitor Management System",
+  "description": "Enterprise multi-role visitor management system with walk-in & pre-registered approval workflows, digital verification, QR/OTP validation, and real-time backend communication.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

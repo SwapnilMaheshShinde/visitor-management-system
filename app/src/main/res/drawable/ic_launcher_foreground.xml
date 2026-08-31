@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Security Shield Outline / Glow -->
+    <path
+        android:fillColor="#1538BDF8"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M54,22 L78,32 C78,56 68,74 54,84 C40,74 30,56 30,32 Z" />
+    
+    <!-- Visitor Badge Card inside shield -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M39,40 C39,38 41,36 43,36 L65,36 C67,36 69,38 69,40 L69,68 C69,70 67,72 65,72 L43,72 C41,72 39,70 39,68 Z" />
+    
+    <!-- ID Card Lanyard Slot -->
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M50,38 L58,38 C58.5,38 59,38.5 59,39 C59,39.5 58.5,40 58,40 L50,40 C49.5,40 49,39.5 49,39 C49,38.5 49.5,38 50,38 Z" />
+
+    <!-- Visitor User Avatar Head & Shoulder -->
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M54,49 C56.2,49 58,47.2 58,45 C58,42.8 56.2,41 54,41 C51.8,41 50,42.8 50,45 C50,47.2 51.8,49 54,49 Z" />
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M46,58 C46,54.5 49.5,52.5 54,52.5 C58.5,52.5 62,54.5 62,58 Z" />
+
+    <!-- Green Approved Check Badge -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M66,62 C69.3,62 72,59.3 72,56 C72,52.7 69.3,50 66,50 C62.7,50 60,52.7 60,56 C60,59.3 62.7,62 66,62 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M63,56 L65,58 L69,54" />
+</vector>

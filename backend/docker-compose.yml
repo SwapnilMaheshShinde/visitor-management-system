@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: vms_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: vms_db
+      POSTGRES_USER: vms_user
+      POSTGRES_PASSWORD: vms_password_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./seeds.sql:/docker-entrypoint-initdb.d/02_seeds.sql
+
+  backend:
+    build: .
+    container_name: vms_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DATABASE_URL: postgresql://vms_user:vms_password_2026@postgres:5432/vms_db
+      JWT_SECRET: vms_enterprise_secret_key_2026
+      NODE_ENV: production
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
