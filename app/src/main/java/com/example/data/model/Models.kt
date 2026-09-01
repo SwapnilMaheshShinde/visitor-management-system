@@ -190,8 +190,8 @@ data class EmployeeHostItem(
 )
 
 data class ServerConfig(
-    val baseUrl: String = "http://10.0.2.2:5000/api/",
-    val useLiveServer: Boolean = false,
+    val baseUrl: String = "https://vms-backend-3n5i.onrender.com/api/",
+    val useLiveServer: Boolean = true,
     val isOnline: Boolean = true,
     val lastPingMs: Long = -1,
     val isDevOtpMode: Boolean = true

@@ -56,12 +56,14 @@ fun EmployeeAppointmentsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(14.dp))
@@ -189,7 +191,8 @@ fun EmployeeHistoryScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         if (visits.isEmpty()) {
             Box(

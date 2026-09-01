@@ -269,23 +269,23 @@ class VmsRepository private constructor(
                     _requests.value = reqRes.body()!!.map { r ->
                         VisitRequest(
                             id = r.id,
-                            visitorName = r.visitorName,
-                            visitorMobile = r.visitorMobile,
-                            visitorCompany = r.visitorCompany ?: "Guest Visitor",
-                            purpose = r.purpose,
-                            idProofType = r.idProofType ?: "National ID",
-                            idProofNumber = r.idProofNumber ?: "",
-                            vehicleNumber = r.vehicleNumber,
-                            hostEmployeeId = r.hostEmployeeId,
-                            hostName = r.hostName ?: "Host Employee",
-                            gateId = r.gateId ?: 1,
-                            gateName = r.gateName ?: "Main Gate",
+                            visitorName = r.visitorName ?: r.visitorNameSnake ?: "Visitor",
+                            visitorMobile = r.visitorMobile ?: r.visitorMobileSnake ?: "",
+                            visitorCompany = r.visitorCompany ?: r.visitorCompanySnake ?: "Guest Visitor",
+                            purpose = r.purpose ?: "Official Visit",
+                            idProofType = r.idProofType ?: r.idProofTypeSnake ?: "National ID",
+                            idProofNumber = r.idProofNumber ?: r.idProofNumberSnake ?: "",
+                            vehicleNumber = r.vehicleNumber ?: r.vehicleNumberSnake,
+                            hostEmployeeId = r.hostEmployeeId ?: r.hostEmployeeIdSnake ?: 1,
+                            hostName = r.hostName ?: r.hostNameSnake ?: "Host Employee",
+                            gateId = r.gateId ?: r.gateIdSnake ?: 1,
+                            gateName = r.gateName ?: r.gateNameSnake ?: "Main Gate",
                             guardUserId = 2,
                             status = try { RequestStatus.valueOf(r.status.uppercase()) } catch (e: Exception) { RequestStatus.PENDING },
-                            decisionTime = r.decisionTime,
-                            decisionReason = r.decisionReason,
-                            meetingRoom = r.meetingRoom,
-                            createdAt = r.createdAt ?: ""
+                            decisionTime = r.decisionTime ?: r.decisionTimeSnake,
+                            decisionReason = r.decisionReason ?: r.decisionReasonSnake,
+                            meetingRoom = r.meetingRoom ?: r.meetingRoomSnake,
+                            createdAt = r.createdAt ?: r.createdAtSnake ?: ""
                         )
                     }
                 }
@@ -304,21 +304,21 @@ class VmsRepository private constructor(
                     _appointments.value = apptRes.body()!!.map { a ->
                         Appointment(
                             id = a.id,
-                            visitorName = a.visitorName,
-                            visitorMobile = a.visitorMobile,
-                            visitorCompany = a.visitorCompany ?: "Partner Guest",
-                            visitorEmail = a.visitorEmail,
-                            hostEmployeeId = a.hostEmployeeId,
-                            hostName = a.hostName ?: "Host",
+                            visitorName = a.visitorName ?: a.visitorNameSnake ?: "Visitor",
+                            visitorMobile = a.visitorMobile ?: a.visitorMobileSnake ?: "",
+                            visitorCompany = a.visitorCompany ?: a.visitorCompanySnake ?: "Partner Guest",
+                            visitorEmail = a.visitorEmail ?: a.visitorEmailSnake,
+                            hostEmployeeId = a.hostEmployeeId ?: a.hostEmployeeIdSnake ?: 1,
+                            hostName = a.hostName ?: a.hostNameSnake ?: "Host",
                             departmentId = 1,
-                            purpose = a.purpose,
-                            expectedDateTime = a.expectedDateTime,
+                            purpose = a.purpose ?: "Official Meeting",
+                            expectedDateTime = a.expectedDateTime ?: a.expectedDateTimeSnake ?: "",
                             status = try { AppointmentStatus.valueOf(a.status.uppercase()) } catch (e: Exception) { AppointmentStatus.SCHEDULED },
-                            otpCode = a.otpCode,
-                            qrToken = a.qrToken,
-                            otpExpiresAt = a.otpExpiresAt,
-                            otpUsed = a.otpUsed,
-                            createdAt = a.createdAt ?: ""
+                            otpCode = a.otpCode ?: a.otpCodeSnake ?: "",
+                            qrToken = a.qrToken ?: a.qrTokenSnake ?: "",
+                            otpExpiresAt = a.otpExpiresAt ?: a.otpExpiresAtSnake ?: "",
+                            otpUsed = a.otpUsed || a.otpUsedSnake,
+                            createdAt = a.createdAt ?: a.createdAtSnake ?: ""
                         )
                     }
                 }
@@ -337,27 +337,29 @@ class VmsRepository private constructor(
                     _insideVisits.value = insideRes.body()!!.map { v ->
                         Visit(
                             id = v.id,
-                            requestId = v.requestId,
-                            appointmentId = v.appointmentId,
-                            visitType = v.visitType ?: "WALK_IN",
-                            visitorName = v.visitorName,
-                            visitorMobile = v.visitorMobile,
-                            visitorCompany = v.visitorCompany ?: "Guest Visitor",
-                            purpose = v.purpose,
+                            requestId = v.requestId ?: v.requestIdSnake,
+                            appointmentId = v.appointmentId ?: v.appointmentIdSnake,
+                            visitType = v.visitType ?: v.visitTypeSnake ?: "WALK_IN",
+                            visitorName = v.visitorName ?: v.visitorNameSnake ?: "Visitor",
+                            visitorMobile = v.visitorMobile ?: v.visitorMobileSnake ?: "",
+                            visitorCompany = v.visitorCompany ?: v.visitorCompanySnake ?: "Guest Visitor",
+                            purpose = v.purpose ?: "Official Visit",
                             idProofType = "ID Verified",
                             idProofNumber = "",
-                            hostEmployeeId = v.hostEmployeeId,
-                            hostName = v.hostName ?: "Host",
-                            gateInId = v.gateInId ?: 1,
-                            gateInName = v.gateInName ?: "Main Gate",
+                            hostEmployeeId = v.hostEmployeeId ?: v.hostEmployeeIdSnake ?: 1,
+                            hostName = v.hostName ?: v.hostNameSnake ?: "Host",
+                            gateInId = v.gateInId ?: v.gateInIdSnake ?: 1,
+                            gateInName = v.gateInName ?: v.gateInNameSnake ?: "Main Gate",
+                            gateOutId = v.gateOutId ?: v.gateOutIdSnake,
+                            gateOutName = v.gateOutName ?: v.gateOutNameSnake,
                             status = VisitStatus.INSIDE,
-                            entryTime = v.entryTime ?: "",
-                            exitTime = v.exitTime,
-                            totalDurationMinutes = v.totalDurationMinutes,
-                            employeeVerified = v.employeeVerified,
-                            employeeVerifiedTime = v.employeeVerifiedTime,
-                            employeeSignatureData = v.employeeSignatureData,
-                            verificationNotes = v.verificationNotes,
+                            entryTime = v.entryTime ?: v.entryTimeSnake ?: "",
+                            exitTime = v.exitTime ?: v.exitTimeSnake,
+                            totalDurationMinutes = v.totalDurationMinutes ?: v.totalDurationMinutesSnake,
+                            employeeVerified = v.employeeVerified || v.employeeVerifiedSnake,
+                            employeeVerifiedTime = v.employeeVerifiedTime ?: v.employeeVerifiedTimeSnake,
+                            employeeSignatureData = v.employeeSignatureData ?: v.employeeSignatureDataSnake,
+                            verificationNotes = v.verificationNotes ?: v.verificationNotesSnake,
                             notes = v.notes
                         )
                     }
@@ -377,27 +379,29 @@ class VmsRepository private constructor(
                     _visitHistory.value = historyRes.body()!!.map { v ->
                         Visit(
                             id = v.id,
-                            requestId = v.requestId,
-                            appointmentId = v.appointmentId,
-                            visitType = v.visitType ?: "WALK_IN",
-                            visitorName = v.visitorName,
-                            visitorMobile = v.visitorMobile,
-                            visitorCompany = v.visitorCompany ?: "Guest Visitor",
-                            purpose = v.purpose,
+                            requestId = v.requestId ?: v.requestIdSnake,
+                            appointmentId = v.appointmentId ?: v.appointmentIdSnake,
+                            visitType = v.visitType ?: v.visitTypeSnake ?: "WALK_IN",
+                            visitorName = v.visitorName ?: v.visitorNameSnake ?: "Visitor",
+                            visitorMobile = v.visitorMobile ?: v.visitorMobileSnake ?: "",
+                            visitorCompany = v.visitorCompany ?: v.visitorCompanySnake ?: "Guest Visitor",
+                            purpose = v.purpose ?: "Official Visit",
                             idProofType = "ID Verified",
                             idProofNumber = "",
-                            hostEmployeeId = v.hostEmployeeId,
-                            hostName = v.hostName ?: "Host",
-                            gateInId = v.gateInId ?: 1,
-                            gateInName = v.gateInName ?: "Main Gate",
+                            hostEmployeeId = v.hostEmployeeId ?: v.hostEmployeeIdSnake ?: 1,
+                            hostName = v.hostName ?: v.hostNameSnake ?: "Host",
+                            gateInId = v.gateInId ?: v.gateInIdSnake ?: 1,
+                            gateInName = v.gateInName ?: v.gateInNameSnake ?: "Main Gate",
+                            gateOutId = v.gateOutId ?: v.gateOutIdSnake,
+                            gateOutName = v.gateOutName ?: v.gateOutNameSnake,
                             status = VisitStatus.COMPLETED,
-                            entryTime = v.entryTime ?: "",
-                            exitTime = v.exitTime,
-                            totalDurationMinutes = v.totalDurationMinutes,
-                            employeeVerified = v.employeeVerified,
-                            employeeVerifiedTime = v.employeeVerifiedTime,
-                            employeeSignatureData = v.employeeSignatureData,
-                            verificationNotes = v.verificationNotes,
+                            entryTime = v.entryTime ?: v.entryTimeSnake ?: "",
+                            exitTime = v.exitTime ?: v.exitTimeSnake,
+                            totalDurationMinutes = v.totalDurationMinutes ?: v.totalDurationMinutesSnake,
+                            employeeVerified = v.employeeVerified || v.employeeVerifiedSnake,
+                            employeeVerifiedTime = v.employeeVerifiedTime ?: v.employeeVerifiedTimeSnake,
+                            employeeSignatureData = v.employeeSignatureData ?: v.employeeSignatureDataSnake,
+                            verificationNotes = v.verificationNotes ?: v.verificationNotesSnake,
                             notes = v.notes
                         )
                     }
@@ -453,9 +457,9 @@ class VmsRepository private constructor(
                         id = p.id,
                         email = p.email,
                         mobile = p.mobile,
-                        name = p.fullName,
+                        name = p.effectiveName,
                         role = try { Role.valueOf(p.role.uppercase()) } catch (e: Exception) { Role.EMPLOYEE },
-                        createdAt = p.createdAt ?: ""
+                        createdAt = p.effectiveCreatedAt
                     )
                 }
                 _pendingUsers.value = list
@@ -514,11 +518,11 @@ class VmsRepository private constructor(
                         id = u.id,
                         email = u.email,
                         mobile = u.mobile,
-                        name = u.fullName,
+                        name = u.effectiveName,
                         role = try { Role.valueOf(u.role.uppercase()) } catch (e: Exception) { Role.EMPLOYEE },
                         active = u.active,
-                        createdAt = u.createdAt ?: "",
-                        approvedAt = u.approvedAt
+                        createdAt = u.effectiveCreatedAt,
+                        approvedAt = u.effectiveApprovedAt
                     )
                 }
                 _adminUsers.value = list
@@ -542,10 +546,10 @@ class VmsRepository private constructor(
                     AuditLogEntry(
                         id = l.id,
                         action = l.action,
-                        entityType = l.entityType,
-                        entityId = l.entityId,
+                        entityType = l.effectiveEntityType,
+                        entityId = l.effectiveEntityId,
                         details = l.details,
-                        createdAt = l.createdAt
+                        createdAt = l.effectiveCreatedAt
                     )
                 }
                 _auditLogs.value = list
@@ -689,13 +693,36 @@ class VmsRepository private constructor(
 
             if (res.isSuccessful) {
                 syncDataFromServer()
+                val serverApptDto = res.body()?.appointment
+                if (serverApptDto != null) {
+                    val serverAppt = Appointment(
+                        id = serverApptDto.id,
+                        visitorName = serverApptDto.visitorName ?: serverApptDto.visitorNameSnake ?: visitorName,
+                        visitorMobile = serverApptDto.visitorMobile ?: serverApptDto.visitorMobileSnake ?: visitorMobile,
+                        visitorCompany = serverApptDto.visitorCompany ?: serverApptDto.visitorCompanySnake ?: "Guest Partner",
+                        visitorEmail = serverApptDto.visitorEmail ?: serverApptDto.visitorEmailSnake ?: visitorEmail,
+                        hostEmployeeId = serverApptDto.hostEmployeeId ?: serverApptDto.hostEmployeeIdSnake ?: (_currentUser.value?.id ?: 1),
+                        hostName = serverApptDto.hostName ?: serverApptDto.hostNameSnake ?: (_currentUser.value?.name ?: "Host"),
+                        departmentId = departmentId,
+                        purpose = serverApptDto.purpose ?: serverApptDto.purpose ?: purpose,
+                        expectedDateTime = serverApptDto.expectedDateTime ?: serverApptDto.expectedDateTimeSnake ?: expectedDateTime,
+                        status = try { AppointmentStatus.valueOf(serverApptDto.status.uppercase()) } catch (e: Exception) { AppointmentStatus.SCHEDULED },
+                        otpCode = serverApptDto.otpCode ?: serverApptDto.otpCodeSnake ?: "",
+                        qrToken = serverApptDto.qrToken ?: serverApptDto.qrTokenSnake ?: "",
+                        otpExpiresAt = serverApptDto.otpExpiresAt ?: serverApptDto.otpExpiresAtSnake ?: "",
+                        otpUsed = serverApptDto.otpUsed || serverApptDto.otpUsedSnake,
+                        createdAt = serverApptDto.createdAt ?: serverApptDto.createdAtSnake ?: ""
+                    )
+                    networkManager.setLastDevOtp(serverAppt.otpCode)
+                    return@withContext Result.success(serverAppt)
+                }
                 val latest = _appointments.value.firstOrNull { it.visitorMobile == visitorMobile.trim() }
                 if (latest != null) {
                     networkManager.setLastDevOtp(latest.otpCode)
                     return@withContext Result.success(latest)
                 }
-                val fallbackAppt = Appointment(
-                    id = System.currentTimeMillis().toInt(),
+                val createdAppt = Appointment(
+                    id = res.body()?.requestId ?: System.currentTimeMillis().toInt(),
                     visitorName = visitorName,
                     visitorMobile = visitorMobile,
                     visitorCompany = visitorCompany,
@@ -712,7 +739,7 @@ class VmsRepository private constructor(
                     otpUsed = false,
                     createdAt = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
                 )
-                Result.success(fallbackAppt)
+                Result.success(createdAppt)
             } else {
                 val err = res.errorBody()?.string() ?: "Failed code ${res.code()}"
                 Result.failure(Exception("Server failed to generate appointment: $err"))

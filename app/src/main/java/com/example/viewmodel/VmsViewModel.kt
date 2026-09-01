@@ -82,7 +82,10 @@ class VmsViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun registerCurrentFcmToken() {
         try {
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            val fcm = FirebaseMessaging.getInstance()
+            // Set auto init to true on demand when user logs in
+            fcm.isAutoInitEnabled = true
+            fcm.token.addOnCompleteListener { task ->
                 if (task.isSuccessful && task.result != null) {
                     val token = task.result
                     Log.d("VmsViewModel", "Retrieved FCM Token: ${token.take(15)}...")
@@ -90,11 +93,11 @@ class VmsViewModel(application: Application) : AndroidViewModel(application) {
                         repository.registerFcmDeviceToken(token)
                     }
                 } else {
-                    Log.w("VmsViewModel", "Fetching FCM registration token failed: ${task.exception?.message}")
+                    Log.i("VmsViewModel", "FCM token not available in current environment (${task.exception?.message ?: "Not registered"}); live sync active.")
                 }
             }
         } catch (e: Exception) {
-            Log.w("VmsViewModel", "Firebase messaging not available or initialized without config: ${e.message}")
+            Log.i("VmsViewModel", "Firebase messaging not available in current environment: ${e.message}")
         }
     }
 
@@ -204,6 +207,7 @@ class VmsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun fetchAdminData() {
         viewModelScope.launch {
+            repository.syncDataFromServer()
             repository.fetchPendingUsers()
             repository.fetchAdminUsers()
             repository.fetchAdminAuditLogs()

@@ -27,7 +27,7 @@ class NetworkManager private constructor(context: Context) {
         private const val KEY_USER_ROLE = "user_role"
         private const val KEY_DEV_OTP_MODE = "dev_otp_mode"
         private const val KEY_LAST_DEV_OTP = "last_dev_otp"
-        private const val DEFAULT_BASE_URL = "http://10.0.2.2:5000/api/" // Android Emulator localhost bridge
+        private const val DEFAULT_BASE_URL = "https://vms-backend-3n5i.onrender.com/api/"
 
         @Volatile
         private var INSTANCE: NetworkManager? = null
@@ -56,11 +56,21 @@ class NetworkManager private constructor(context: Context) {
     private var apiService: VmsApiService? = null
 
     init {
+        // Automatically migrate legacy local/emulator URLs to production Render URL
+        val currentSavedUrl = prefs.getString(KEY_BASE_URL, null)
+        if (currentSavedUrl == null || currentSavedUrl.contains("10.0.2.2") || currentSavedUrl.contains("localhost") || currentSavedUrl.contains("192.168.")) {
+            prefs.edit().putString(KEY_BASE_URL, DEFAULT_BASE_URL).apply()
+            _baseUrlState.value = DEFAULT_BASE_URL
+        }
         buildApiService()
     }
 
     fun getBaseUrl(): String {
-        return prefs.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        val saved = prefs.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        if (saved.contains("10.0.2.2") || saved.contains("localhost") || saved.contains("192.168.")) {
+            return DEFAULT_BASE_URL
+        }
+        return saved
     }
 
     fun setBaseUrl(newUrl: String) {

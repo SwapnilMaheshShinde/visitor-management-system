@@ -759,7 +759,7 @@ app.post('/api/requests/:id/grant-entry', authenticateToken, async (req, res) =>
             INSERT INTO visits (
                 request_id, visit_type, visitor_name, visitor_mobile, visitor_company,
                 purpose, id_proof_type, id_proof_number, vehicle_number,
-                host_employee_id, gate_in_id, guard_in_id, status, entry_time, notes
+                host_employee_id, gate_in_id, guard_in_id, status, entry_time, verification_notes
             )
             VALUES ($1, 'WALK_IN', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'INSIDE', NOW(), $12)
             RETURNING id, entry_time
@@ -947,7 +947,7 @@ app.post('/api/verify/otp', authenticateToken, async (req, res) => {
             INSERT INTO visits (
                 appointment_id, visit_type, visitor_name, visitor_mobile, visitor_company,
                 purpose, id_proof_type, id_proof_number, host_employee_id,
-                gate_in_id, guard_in_id, status, entry_time, notes
+                gate_in_id, guard_in_id, status, entry_time, verification_notes
             )
             VALUES ($1, 'PRE_REGISTERED', $2, $3, $4, $5, 'Verified Pass OTP', $6, $7, $8, $9, 'INSIDE', NOW(), 'Pre-registered Entry via OTP')
             RETURNING id, entry_time
@@ -1011,7 +1011,7 @@ app.post('/api/verify/qr', authenticateToken, async (req, res) => {
             INSERT INTO visits (
                 appointment_id, visit_type, visitor_name, visitor_mobile, visitor_company,
                 purpose, id_proof_type, id_proof_number, host_employee_id,
-                gate_in_id, guard_in_id, status, entry_time, notes
+                gate_in_id, guard_in_id, status, entry_time, verification_notes
             )
             VALUES ($1, 'PRE_REGISTERED', $2, $3, $4, $5, 'Digital QR Pass', $6, $7, $8, $9, 'INSIDE', NOW(), 'Pre-registered Entry via QR')
             RETURNING id, entry_time
@@ -1067,7 +1067,7 @@ app.get('/api/visits/inside', authenticateToken, async (req, res) => {
                    v.employee_verified_time as "employeeVerifiedTime",
                    v.employee_signature_data as "employeeSignatureData",
                    v.verification_notes as "verificationNotes",
-                   v.notes, u.full_name as "hostName", g.name as "gateInName"
+                   v.verification_notes as "notes", u.full_name as "hostName", g.name as "gateInName"
             FROM visits v
             LEFT JOIN users u ON v.host_employee_id = u.id
             LEFT JOIN gates g ON v.gate_in_id = g.id
@@ -1110,7 +1110,7 @@ app.get('/api/visits/history', authenticateToken, async (req, res) => {
                    v.employee_verified_time as "employeeVerifiedTime",
                    v.employee_signature_data as "employeeSignatureData",
                    v.verification_notes as "verificationNotes",
-                   v.notes, u.full_name as "hostName", g1.name as "gateInName", g2.name as "gateOutName"
+                   v.verification_notes as "notes", u.full_name as "hostName", g1.name as "gateInName", g2.name as "gateOutName"
             FROM visits v
             LEFT JOIN users u ON v.host_employee_id = u.id
             LEFT JOIN gates g1 ON v.gate_in_id = g1.id

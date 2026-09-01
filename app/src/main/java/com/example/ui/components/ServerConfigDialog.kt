@@ -158,7 +158,7 @@ fun ServerConfigDialog(
                     singleLine = true,
                     colors = vmsOutlinedTextFieldColors(),
                     textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, color = DeepNavyDark),
-                    placeholder = { Text("http://192.168.1.X:5000/api/") },
+                    placeholder = { Text("https://vms-backend-3n5i.onrender.com/api/") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp)
                 )
@@ -176,12 +176,8 @@ fun ServerConfigDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     SuggestionChip(
-                        onClick = { inputUrl = "http://10.0.2.2:5000/api/" },
-                        label = { Text("Emulator (10.0.2.2)", fontSize = 11.sp) }
-                    )
-                    SuggestionChip(
-                        onClick = { inputUrl = "http://localhost:5000/api/" },
-                        label = { Text("Localhost", fontSize = 11.sp) }
+                        onClick = { inputUrl = "https://vms-backend-3n5i.onrender.com/api/" },
+                        label = { Text("Render Production", fontSize = 11.sp, fontWeight = FontWeight.Medium) }
                     )
                 }
 

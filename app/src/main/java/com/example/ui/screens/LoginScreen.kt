@@ -84,12 +84,14 @@ fun LoginScreen(
     }
 
     Scaffold(
-        containerColor = DeepNavyDark
+        containerColor = DeepNavyDark,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally

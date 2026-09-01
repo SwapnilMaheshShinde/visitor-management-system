@@ -55,7 +55,8 @@ fun GuardQrScannerScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = DeepNavyDark
+        containerColor = DeepNavyDark,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
@@ -102,12 +103,14 @@ fun GuardOtpVerifyScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -149,7 +152,8 @@ fun GuardInsideVisitorsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         if (insideVisits.isEmpty()) {
             Box(

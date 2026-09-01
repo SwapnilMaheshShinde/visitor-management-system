@@ -85,12 +85,14 @@ fun NewWalkInScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)

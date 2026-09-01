@@ -46,7 +46,8 @@ fun NotificationCenterScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         if (notifications.isEmpty()) {
             Box(

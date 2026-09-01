@@ -50,6 +50,10 @@ fun AdminDashboardScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Overview, 1: Pending Approvals, 2: Users & Gates, 3: Audit Logs
 
+    LaunchedEffect(Unit) {
+        onRefresh()
+    }
+
     Scaffold(
         topBar = {
             VmsTopAppBar(
@@ -63,7 +67,8 @@ fun AdminDashboardScreen(
                 onLogout = onLogout
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier

@@ -39,41 +39,75 @@ data class RegisterRequestDto(
 @JsonClass(generateAdapter = true)
 data class PendingUserDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "email") val email: String,
-    @Json(name = "mobile") val mobile: String,
-    @Json(name = "full_name") val fullName: String,
-    @Json(name = "role") val role: String,
-    @Json(name = "created_at") val createdAt: String? = null
-)
+    @Json(name = "email") val email: String = "",
+    @Json(name = "mobile") val mobile: String = "",
+    @Json(name = "fullName") val fullName: String? = null,
+    @Json(name = "full_name") val fullNameSnake: String? = null,
+    @Json(name = "name") val name: String? = null,
+    @Json(name = "role") val role: String = "EMPLOYEE",
+    @Json(name = "createdAt") val createdAt: String? = null,
+    @Json(name = "created_at") val createdAtSnake: String? = null
+) {
+    val effectiveName: String
+        get() = fullName ?: fullNameSnake ?: name ?: "User"
+
+    val effectiveCreatedAt: String
+        get() = createdAt ?: createdAtSnake ?: ""
+}
 
 @JsonClass(generateAdapter = true)
 data class AdminUserItemDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "email") val email: String,
-    @Json(name = "mobile") val mobile: String,
-    @Json(name = "full_name") val fullName: String,
-    @Json(name = "role") val role: String,
-    @Json(name = "active") val active: Boolean,
-    @Json(name = "created_at") val createdAt: String? = null,
-    @Json(name = "approved_at") val approvedAt: String? = null
-)
+    @Json(name = "email") val email: String = "",
+    @Json(name = "mobile") val mobile: String = "",
+    @Json(name = "fullName") val fullName: String? = null,
+    @Json(name = "full_name") val fullNameSnake: String? = null,
+    @Json(name = "name") val name: String? = null,
+    @Json(name = "role") val role: String = "EMPLOYEE",
+    @Json(name = "active") val active: Boolean = false,
+    @Json(name = "createdAt") val createdAt: String? = null,
+    @Json(name = "created_at") val createdAtSnake: String? = null,
+    @Json(name = "approvedAt") val approvedAt: String? = null,
+    @Json(name = "approved_at") val approvedAtSnake: String? = null
+) {
+    val effectiveName: String
+        get() = fullName ?: fullNameSnake ?: name ?: "User"
+
+    val effectiveCreatedAt: String
+        get() = createdAt ?: createdAtSnake ?: ""
+
+    val effectiveApprovedAt: String?
+        get() = approvedAt ?: approvedAtSnake
+}
 
 @JsonClass(generateAdapter = true)
 data class AuditLogDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "action") val action: String,
-    @Json(name = "entity_type") val entityType: String,
-    @Json(name = "entity_id") val entityId: String,
-    @Json(name = "details") val details: String,
-    @Json(name = "created_at") val createdAt: String
-)
+    @Json(name = "action") val action: String = "",
+    @Json(name = "entityType") val entityType: String? = null,
+    @Json(name = "entity_type") val entityTypeSnake: String? = null,
+    @Json(name = "entityId") val entityId: String? = null,
+    @Json(name = "entity_id") val entityIdSnake: String? = null,
+    @Json(name = "details") val details: String = "",
+    @Json(name = "createdAt") val createdAt: String? = null,
+    @Json(name = "created_at") val createdAtSnake: String? = null
+) {
+    val effectiveEntityType: String
+        get() = entityType ?: entityTypeSnake ?: "SYSTEM"
+
+    val effectiveEntityId: String
+        get() = entityId ?: entityIdSnake ?: ""
+
+    val effectiveCreatedAt: String
+        get() = createdAt ?: createdAtSnake ?: ""
+}
 
 @JsonClass(generateAdapter = true)
 data class EmployeeMetaDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "name") val name: String,
-    @Json(name = "email") val email: String,
-    @Json(name = "mobile") val mobile: String,
+    @Json(name = "name") val name: String = "",
+    @Json(name = "email") val email: String = "",
+    @Json(name = "mobile") val mobile: String = "",
     @Json(name = "employeeCode") val employeeCode: String? = null,
     @Json(name = "designation") val designation: String? = null,
     @Json(name = "department") val department: String? = null,
@@ -83,10 +117,10 @@ data class EmployeeMetaDto(
 @JsonClass(generateAdapter = true)
 data class UserDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "email") val email: String,
-    @Json(name = "mobile") val mobile: String,
-    @Json(name = "name") val name: String,
-    @Json(name = "role") val role: String,
+    @Json(name = "email") val email: String = "",
+    @Json(name = "mobile") val mobile: String = "",
+    @Json(name = "name") val name: String = "",
+    @Json(name = "role") val role: String = "EMPLOYEE",
     @Json(name = "avatar") val avatar: String? = null
 )
 
@@ -158,75 +192,123 @@ data class MarkExitDto(
 @JsonClass(generateAdapter = true)
 data class VisitRequestDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "visitor_name") val visitorName: String,
-    @Json(name = "visitor_mobile") val visitorMobile: String,
-    @Json(name = "visitor_company") val visitorCompany: String? = null,
-    @Json(name = "purpose") val purpose: String,
-    @Json(name = "id_proof_type") val idProofType: String? = "National ID",
-    @Json(name = "id_proof_number") val idProofNumber: String? = "",
-    @Json(name = "vehicle_number") val vehicleNumber: String? = null,
-    @Json(name = "host_employee_id") val hostEmployeeId: Int,
-    @Json(name = "host_name") val hostName: String? = null,
-    @Json(name = "gate_id") val gateId: Int? = 1,
-    @Json(name = "gate_name") val gateName: String? = null,
-    @Json(name = "status") val status: String,
-    @Json(name = "decision_time") val decisionTime: String? = null,
-    @Json(name = "decision_reason") val decisionReason: String? = null,
-    @Json(name = "meeting_room") val meetingRoom: String? = null,
-    @Json(name = "created_at") val createdAt: String? = null
+    @Json(name = "visitorName") val visitorName: String? = null,
+    @Json(name = "visitor_name") val visitorNameSnake: String? = null,
+    @Json(name = "visitorMobile") val visitorMobile: String? = null,
+    @Json(name = "visitor_mobile") val visitorMobileSnake: String? = null,
+    @Json(name = "visitorCompany") val visitorCompany: String? = null,
+    @Json(name = "visitor_company") val visitorCompanySnake: String? = null,
+    @Json(name = "purpose") val purpose: String? = null,
+    @Json(name = "idProofType") val idProofType: String? = null,
+    @Json(name = "id_proof_type") val idProofTypeSnake: String? = null,
+    @Json(name = "idProofNumber") val idProofNumber: String? = null,
+    @Json(name = "id_proof_number") val idProofNumberSnake: String? = null,
+    @Json(name = "vehicleNumber") val vehicleNumber: String? = null,
+    @Json(name = "vehicle_number") val vehicleNumberSnake: String? = null,
+    @Json(name = "hostEmployeeId") val hostEmployeeId: Int? = null,
+    @Json(name = "host_employee_id") val hostEmployeeIdSnake: Int? = null,
+    @Json(name = "hostName") val hostName: String? = null,
+    @Json(name = "host_name") val hostNameSnake: String? = null,
+    @Json(name = "gateId") val gateId: Int? = 1,
+    @Json(name = "gate_id") val gateIdSnake: Int? = 1,
+    @Json(name = "gateName") val gateName: String? = null,
+    @Json(name = "gate_name") val gateNameSnake: String? = null,
+    @Json(name = "status") val status: String = "PENDING",
+    @Json(name = "decisionTime") val decisionTime: String? = null,
+    @Json(name = "decision_time") val decisionTimeSnake: String? = null,
+    @Json(name = "decisionReason") val decisionReason: String? = null,
+    @Json(name = "decision_reason") val decisionReasonSnake: String? = null,
+    @Json(name = "meetingRoom") val meetingRoom: String? = null,
+    @Json(name = "meeting_room") val meetingRoomSnake: String? = null,
+    @Json(name = "createdAt") val createdAt: String? = null,
+    @Json(name = "created_at") val createdAtSnake: String? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class AppointmentDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "visitor_name") val visitorName: String,
-    @Json(name = "visitor_mobile") val visitorMobile: String,
-    @Json(name = "visitor_company") val visitorCompany: String? = null,
-    @Json(name = "visitor_email") val visitorEmail: String? = null,
-    @Json(name = "host_employee_id") val hostEmployeeId: Int,
-    @Json(name = "host_name") val hostName: String? = null,
-    @Json(name = "purpose") val purpose: String,
-    @Json(name = "expected_date_time") val expectedDateTime: String,
-    @Json(name = "status") val status: String,
-    @Json(name = "otp_code") val otpCode: String,
-    @Json(name = "qr_token") val qrToken: String,
-    @Json(name = "otp_expires_at") val otpExpiresAt: String,
-    @Json(name = "otp_used") val otpUsed: Boolean = false,
-    @Json(name = "created_at") val createdAt: String? = null
+    @Json(name = "visitorName") val visitorName: String? = null,
+    @Json(name = "visitor_name") val visitorNameSnake: String? = null,
+    @Json(name = "visitorMobile") val visitorMobile: String? = null,
+    @Json(name = "visitor_mobile") val visitorMobileSnake: String? = null,
+    @Json(name = "visitorCompany") val visitorCompany: String? = null,
+    @Json(name = "visitor_company") val visitorCompanySnake: String? = null,
+    @Json(name = "visitorEmail") val visitorEmail: String? = null,
+    @Json(name = "visitor_email") val visitorEmailSnake: String? = null,
+    @Json(name = "hostEmployeeId") val hostEmployeeId: Int? = null,
+    @Json(name = "host_employee_id") val hostEmployeeIdSnake: Int? = null,
+    @Json(name = "hostName") val hostName: String? = null,
+    @Json(name = "host_name") val hostNameSnake: String? = null,
+    @Json(name = "purpose") val purpose: String? = null,
+    @Json(name = "expectedDateTime") val expectedDateTime: String? = null,
+    @Json(name = "expected_date_time") val expectedDateTimeSnake: String? = null,
+    @Json(name = "status") val status: String = "SCHEDULED",
+    @Json(name = "otpCode") val otpCode: String? = null,
+    @Json(name = "otp_code") val otpCodeSnake: String? = null,
+    @Json(name = "qrToken") val qrToken: String? = null,
+    @Json(name = "qr_token") val qrTokenSnake: String? = null,
+    @Json(name = "otpExpiresAt") val otpExpiresAt: String? = null,
+    @Json(name = "otp_expires_at") val otpExpiresAtSnake: String? = null,
+    @Json(name = "otpUsed") val otpUsed: Boolean = false,
+    @Json(name = "otp_used") val otpUsedSnake: Boolean = false,
+    @Json(name = "createdAt") val createdAt: String? = null,
+    @Json(name = "created_at") val createdAtSnake: String? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class VisitDto(
     @Json(name = "id") val id: Int,
-    @Json(name = "request_id") val requestId: Int? = null,
-    @Json(name = "appointment_id") val appointmentId: Int? = null,
-    @Json(name = "visit_type") val visitType: String? = "WALK_IN",
-    @Json(name = "visitor_name") val visitorName: String,
-    @Json(name = "visitor_mobile") val visitorMobile: String,
-    @Json(name = "visitor_company") val visitorCompany: String? = null,
-    @Json(name = "purpose") val purpose: String,
-    @Json(name = "host_employee_id") val hostEmployeeId: Int,
-    @Json(name = "host_name") val hostName: String? = null,
-    @Json(name = "gate_in_id") val gateInId: Int? = 1,
-    @Json(name = "gate_in_name") val gateInName: String? = "Main Gate",
-    @Json(name = "gate_out_id") val gateOutId: Int? = null,
-    @Json(name = "gate_out_name") val gateOutName: String? = null,
-    @Json(name = "status") val status: String,
-    @Json(name = "entry_time") val entryTime: String,
-    @Json(name = "exit_time") val exitTime: String? = null,
-    @Json(name = "total_duration_minutes") val totalDurationMinutes: Int? = null,
-    @Json(name = "employee_verified") val employeeVerified: Boolean = false,
-    @Json(name = "employee_verified_time") val employeeVerifiedTime: String? = null,
-    @Json(name = "employee_signature_data") val employeeSignatureData: String? = null,
-    @Json(name = "verification_notes") val verificationNotes: String? = null,
+    @Json(name = "requestId") val requestId: Int? = null,
+    @Json(name = "request_id") val requestIdSnake: Int? = null,
+    @Json(name = "appointmentId") val appointmentId: Int? = null,
+    @Json(name = "appointment_id") val appointmentIdSnake: Int? = null,
+    @Json(name = "visitType") val visitType: String? = "WALK_IN",
+    @Json(name = "visit_type") val visitTypeSnake: String? = "WALK_IN",
+    @Json(name = "visitorName") val visitorName: String? = null,
+    @Json(name = "visitor_name") val visitorNameSnake: String? = null,
+    @Json(name = "visitorMobile") val visitorMobile: String? = null,
+    @Json(name = "visitor_mobile") val visitorMobileSnake: String? = null,
+    @Json(name = "visitorCompany") val visitorCompany: String? = null,
+    @Json(name = "visitor_company") val visitorCompanySnake: String? = null,
+    @Json(name = "purpose") val purpose: String? = null,
+    @Json(name = "hostEmployeeId") val hostEmployeeId: Int? = null,
+    @Json(name = "host_employee_id") val hostEmployeeIdSnake: Int? = null,
+    @Json(name = "hostName") val hostName: String? = null,
+    @Json(name = "host_name") val hostNameSnake: String? = null,
+    @Json(name = "gateInId") val gateInId: Int? = 1,
+    @Json(name = "gate_in_id") val gateInIdSnake: Int? = 1,
+    @Json(name = "gateInName") val gateInName: String? = "Main Gate",
+    @Json(name = "gate_in_name") val gateInNameSnake: String? = "Main Gate",
+    @Json(name = "gateOutId") val gateOutId: Int? = null,
+    @Json(name = "gate_out_id") val gateOutIdSnake: Int? = null,
+    @Json(name = "gateOutName") val gateOutName: String? = null,
+    @Json(name = "gate_out_name") val gateOutNameSnake: String? = null,
+    @Json(name = "status") val status: String = "INSIDE",
+    @Json(name = "entryTime") val entryTime: String? = null,
+    @Json(name = "entry_time") val entryTimeSnake: String? = null,
+    @Json(name = "exitTime") val exitTime: String? = null,
+    @Json(name = "exit_time") val exitTimeSnake: String? = null,
+    @Json(name = "totalDurationMinutes") val totalDurationMinutes: Int? = null,
+    @Json(name = "total_duration_minutes") val totalDurationMinutesSnake: Int? = null,
+    @Json(name = "employeeVerified") val employeeVerified: Boolean = false,
+    @Json(name = "employee_verified") val employeeVerifiedSnake: Boolean = false,
+    @Json(name = "employeeVerifiedTime") val employeeVerifiedTime: String? = null,
+    @Json(name = "employee_verified_time") val employeeVerifiedTimeSnake: String? = null,
+    @Json(name = "employeeSignatureData") val employeeSignatureData: String? = null,
+    @Json(name = "employee_signature_data") val employeeSignatureDataSnake: String? = null,
+    @Json(name = "verificationNotes") val verificationNotes: String? = null,
+    @Json(name = "verification_notes") val verificationNotesSnake: String? = null,
     @Json(name = "notes") val notes: String? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class ApiResponseDto(
-    @Json(name = "success") val success: Boolean,
+    @Json(name = "success") val success: Boolean = true,
     @Json(name = "message") val message: String? = null,
-    @Json(name = "error") val error: String? = null
+    @Json(name = "error") val error: String? = null,
+    @Json(name = "requestId") val requestId: Int? = null,
+    @Json(name = "visitId") val visitId: Int? = null,
+    @Json(name = "appointment") val appointment: AppointmentDto? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -245,9 +327,8 @@ data class StatsDto(
 @JsonClass(generateAdapter = true)
 data class HealthCheckDto(
     @Json(name = "status") val status: String,
-    @Json(name = "serverTime") val serverTime: String,
-    @Json(name = "database") val database: String,
-    @Json(name = "version") val version: String
+    @Json(name = "serverTime") val serverTime: String? = null,
+    @Json(name = "version") val version: String? = null
 )
 
 @JsonClass(generateAdapter = true)

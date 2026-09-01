@@ -67,7 +67,8 @@ fun EmployeeDashboardScreen(
                 onLogout = onLogout
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         LazyColumn(
             modifier = Modifier
