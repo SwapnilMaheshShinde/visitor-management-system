@@ -40,21 +40,35 @@ fun ServerConfigDialog(
     var testResult by remember { mutableStateOf<Pair<Boolean, Long>?>(null) }
     val scope = rememberCoroutineScope()
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = SlateLightCard,
-            tonalElevation = 8.dp,
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .fillMaxSize()
+                .imePadding()
+                .systemBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = SlateLightCard,
+                tonalElevation = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp)
+                    .widthIn(max = 520.dp)
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp)
+                ) {
                 // Header
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -275,4 +289,5 @@ fun ServerConfigDialog(
             }
         }
     }
+}
 }

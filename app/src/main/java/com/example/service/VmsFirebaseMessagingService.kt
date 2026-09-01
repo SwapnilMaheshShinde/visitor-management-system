@@ -16,18 +16,18 @@ import com.example.R
 import com.example.data.remote.NetworkManager
 import com.example.data.remote.RegisterFcmDto
 import com.example.data.repository.VmsRepository
-import com.example.ui.screens.call.IncomingCallActivity
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 class VmsFirebaseMessagingService : FirebaseMessagingService() {
 
     companion object {
-        const val CHANNEL_ID_INCOMING_CALL = "vms_incoming_visitor_call"
-        const val CHANNEL_NAME_INCOMING_CALL = "🚨 Incoming Visitor Calls"
+        const val CHANNEL_ID_VISITOR_ARRIVALS = "vms_visitor_arrivals"
+        const val CHANNEL_NAME_VISITOR_ARRIVALS = "Visitor Arrivals"
 
         const val CHANNEL_ID_URGENT_ALERTS = "vms_urgent_visitor_alerts"
         const val CHANNEL_NAME_URGENT_ALERTS = "Urgent Security Alerts"
@@ -35,8 +35,11 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
         const val CHANNEL_ID_STANDARD = "vms_standard_notifications"
         const val CHANNEL_NAME_STANDARD = "VMS Notices & Updates"
 
-        const val CALL_NOTIFICATION_ID = 1001
-        const val TAG = "VmsFCM"
+        private const val TAG = "VmsFCM"
+
+        // Deduplication cache to prevent firing duplicate notifications if duplicate FCM frames arrive
+        private val recentNotificationTimestamps = ConcurrentHashMap<String, Long>()
+        private const val DEDUP_WINDOW_MS = 10_000L // 10 seconds
     }
 
     override fun onNewToken(token: String) {
@@ -50,7 +53,13 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
                 val authToken = netMgr.getAuthToken()
                 if (authToken.isNotEmpty()) {
                     val api = netMgr.getApiService()
-                    api.registerFcm(authToken, RegisterFcmDto(fcmToken = token, deviceName = "${Build.MANUFACTURER} ${Build.MODEL}"))
+                    api.registerFcm(
+                        authToken,
+                        RegisterFcmDto(
+                            fcmToken = token,
+                            deviceName = "${Build.MANUFACTURER} ${Build.MODEL}"
+                        )
+                    )
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to register FCM token with backend: ${e.message}")
@@ -65,12 +74,20 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
         val data = remoteMessage.data
         val type = data["type"] ?: "STANDARD"
 
-        when {
-            type.equals("INCOMING_VISITOR_CALL", ignoreCase = true) -> {
-                handleIncomingVisitorCall(data)
+        // Sync local database in background for fresh real-time state
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                VmsRepository.getInstance(applicationContext).syncDataFromServer()
+            } catch (e: Exception) {
+                Log.w(TAG, "Background sync on FCM arrival failed: ${e.message}")
             }
-            type.equals("VISITOR_CALL_DISMISSED", ignoreCase = true) -> {
-                handleCallDismissed(data)
+        }
+
+        when {
+            type.equals("VISITOR_ARRIVAL", ignoreCase = true) ||
+            type.equals("INCOMING_VISITOR_CALL", ignoreCase = true) ||
+            type.equals("VISITOR_REQUEST", ignoreCase = true) -> {
+                handleVisitorArrivalNotification(data)
             }
             type.equals("REQUEST_DECISION", ignoreCase = true) -> {
                 handleRequestDecision(data)
@@ -83,168 +100,104 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun handleIncomingVisitorCall(data: Map<String, String>) {
-        val requestId = data["requestId"]?.toIntOrNull() ?: 0
-        val callId = data["callId"] ?: "CALL_${requestId}_${System.currentTimeMillis()}"
-        val visitorName = data["visitorName"] ?: "Guest Visitor"
-        val visitorMobile = data["visitorMobile"] ?: ""
-        val visitorCompany = data["visitorCompany"] ?: "Visitor"
-        val purpose = data["purpose"] ?: "Official Visit"
-        val gateName = data["gateName"] ?: "Main Security Gate"
-        val guardName = data["guardName"] ?: "Security Officer"
-        val vehicleNumber = data["vehicleNumber"] ?: ""
-        val idProofType = data["idProofType"] ?: "National ID"
-        val idProofNumber = data["idProofNumber"] ?: ""
-        val createdAt = data["createdAt"] ?: ""
+    /**
+     * Handles professional Visitor Arrival Push Notification
+     * Displays a clean, high-priority notification with visitor details and opens the Employee Dashboard on tap.
+     */
+    private fun handleVisitorArrivalNotification(data: Map<String, String>) {
+        val requestId = data["requestId"]?.toIntOrNull() ?: (System.currentTimeMillis() % 100000).toInt()
+        val visitorName = data["visitorName"]?.takeIf { it.isNotBlank() } ?: "Guest Visitor"
+        val visitorCompany = data["visitorCompany"]?.takeIf { it.isNotBlank() } ?: "Guest"
+        val purpose = data["purpose"]?.takeIf { it.isNotBlank() } ?: "Official Visit"
+        val gateName = data["gateName"]?.takeIf { it.isNotBlank() } ?: "Main Security Gate"
+        val guardName = data["guardName"]?.takeIf { it.isNotBlank() } ?: "Security Officer"
+
+        // Deduplication check
+        val dedupKey = "arrival_${requestId}_$visitorName"
+        val now = System.currentTimeMillis()
+        val lastSeen = recentNotificationTimestamps[dedupKey] ?: 0L
+        if (now - lastSeen < DEDUP_WINDOW_MS) {
+            Log.d(TAG, "Skipping duplicate notification for key: $dedupKey")
+            return
+        }
+        recentNotificationTimestamps[dedupKey] = now
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val ringtoneUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-        // 1. Create High-Priority Notification Channel with Ringtone
+        // Create Dedicated High-Importance "Visitor Arrivals" Channel (API 26+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val audioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_REQUEST)
                 .build()
 
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
             val channel = NotificationChannel(
-                CHANNEL_ID_INCOMING_CALL,
-                CHANNEL_NAME_INCOMING_CALL,
+                CHANNEL_ID_VISITOR_ARRIVALS,
+                CHANNEL_NAME_VISITOR_ARRIVALS,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Incoming real-time visitor phone calls for host employees"
+                description = "Real-time notifications when visitors arrive at security gates"
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 1000, 800, 1000, 800)
-                setSound(ringtoneUri, audioAttributes)
+                vibrationPattern = longArrayOf(0, 300, 150, 300)
+                setSound(soundUri, audioAttributes)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
             }
             notificationManager.createNotificationChannel(channel)
         }
 
-        // 2. Full-Screen Intent for IncomingCallActivity
-        val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(IncomingCallActivity.EXTRA_REQUEST_ID, requestId)
-            putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId)
-            putExtra(IncomingCallActivity.EXTRA_NOTIFICATION_ID, CALL_NOTIFICATION_ID)
-            putExtra(IncomingCallActivity.EXTRA_VISITOR_NAME, visitorName)
-            putExtra(IncomingCallActivity.EXTRA_VISITOR_MOBILE, visitorMobile)
-            putExtra(IncomingCallActivity.EXTRA_VISITOR_COMPANY, visitorCompany)
-            putExtra(IncomingCallActivity.EXTRA_PURPOSE, purpose)
-            putExtra(IncomingCallActivity.EXTRA_GATE_NAME, gateName)
-            putExtra(IncomingCallActivity.EXTRA_GUARD_NAME, guardName)
-            putExtra(IncomingCallActivity.EXTRA_VEHICLE_NUMBER, vehicleNumber)
-            putExtra(IncomingCallActivity.EXTRA_ID_PROOF_TYPE, idProofType)
-            putExtra(IncomingCallActivity.EXTRA_ID_PROOF_NUMBER, idProofNumber)
-            putExtra(IncomingCallActivity.EXTRA_CREATED_AT, createdAt)
+        // Tapping the notification opens the Employee Dashboard directly
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("nav_destination", "employee_dashboard")
+            putExtra("request_id", requestId)
         }
 
-        val fullScreenPendingIntent = PendingIntent.getActivity(
+        val pendingIntent = PendingIntent.getActivity(
             this,
-            requestId + 100,
-            fullScreenIntent,
+            requestId,
+            openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 3. Action: ACCEPT Direct Action PendingIntent
-        val acceptIntent = Intent(this, IncomingCallActionReceiver::class.java).apply {
-            action = IncomingCallActionReceiver.ACTION_ACCEPT_CALL
-            putExtra(IncomingCallActionReceiver.EXTRA_REQUEST_ID, requestId)
-            putExtra(IncomingCallActionReceiver.EXTRA_NOTIFICATION_ID, CALL_NOTIFICATION_ID)
-            putExtra(IncomingCallActionReceiver.EXTRA_VISITOR_NAME, visitorName)
-            putExtra(IncomingCallActionReceiver.EXTRA_MEETING_ROOM, "Conference Room A")
+        val title = "Visitor Arrival Request"
+        val summaryText = "$visitorName • $visitorCompany arrived at $gateName"
+
+        val bigTextContent = buildString {
+            append("Visitor: ").append(visitorName).append("\n")
+            append("Company: ").append(visitorCompany).append("\n")
+            append("Purpose: ").append(purpose).append("\n")
+            append("Gate: ").append(gateName).append("\n")
+            append("Guard: ").append(guardName)
         }
-        val acceptPendingIntent = PendingIntent.getBroadcast(
-            this,
-            requestId + 200,
-            acceptIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
 
-        // 4. Action: DECLINE Direct Action PendingIntent
-        val declineIntent = Intent(this, IncomingCallActionReceiver::class.java).apply {
-            action = IncomingCallActionReceiver.ACTION_DECLINE_CALL
-            putExtra(IncomingCallActionReceiver.EXTRA_REQUEST_ID, requestId)
-            putExtra(IncomingCallActionReceiver.EXTRA_NOTIFICATION_ID, CALL_NOTIFICATION_ID)
-            putExtra(IncomingCallActionReceiver.EXTRA_VISITOR_NAME, visitorName)
-            putExtra(IncomingCallActionReceiver.EXTRA_REASON, "Declined by host")
-        }
-        val declinePendingIntent = PendingIntent.getBroadcast(
-            this,
-            requestId + 300,
-            declineIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // 5. Build High-Priority Incoming Call Notification
-        val notificationTitle = "🚨 INCOMING VISITOR: $visitorName"
-        val notificationBody = "$visitorCompany • Purpose: $purpose at $gateName"
-
-        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID_INCOMING_CALL)
+        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID_VISITOR_ARRIVALS)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(notificationTitle)
-            .setContentText(notificationBody)
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("$visitorName ($visitorCompany) is waiting at $gateName.\nPurpose: $purpose\nSecurity Officer: $guardName")
-            )
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setContentTitle(title)
+            .setContentText(summaryText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigTextContent))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setSound(ringtoneUri)
-            .setVibrate(longArrayOf(0, 1000, 800, 1000, 800))
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setContentIntent(fullScreenPendingIntent)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
-            .addAction(R.drawable.ic_launcher_foreground, "✅ ACCEPT / APPROVE", acceptPendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "❌ DECLINE", declinePendingIntent)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setVibrate(longArrayOf(0, 300, 150, 300))
 
-        notificationManager.notify(CALL_NOTIFICATION_ID, notificationBuilder.build())
-
-        // 6. Direct Activity Launch (works immediately when screen is ON or unlocked)
-        try {
-            startActivity(fullScreenIntent)
-        } catch (e: Exception) {
-            Log.w(TAG, "Direct activity launch deferred to full screen intent: ${e.message}")
-        }
+        notificationManager.notify(requestId, notificationBuilder.build())
     }
 
-    private fun handleCallDismissed(data: Map<String, String>) {
-        val requestId = data["requestId"]?.toIntOrNull() ?: 0
-        Log.d(TAG, "Handling call dismissal for request: $requestId")
-
-        VisitorCallPlayer.stop()
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(CALL_NOTIFICATION_ID)
-
-        val dismissBroadcast = Intent(IncomingCallActionReceiver.ACTION_CALL_DISMISSED).apply {
-            putExtra(IncomingCallActionReceiver.EXTRA_REQUEST_ID, requestId)
-            setPackage(packageName)
-        }
-        sendBroadcast(dismissBroadcast)
-    }
-
+    /**
+     * Handles decision notifications dispatched when a Host approves or declines a visitor
+     */
     private fun handleRequestDecision(data: Map<String, String>) {
-        val requestId = data["requestId"]
+        val requestId = data["requestId"]?.toIntOrNull() ?: (System.currentTimeMillis() % 100000).toInt()
         val status = data["status"] ?: "DECIDED"
         val visitorName = data["visitorName"] ?: "Visitor"
         val isApproved = status.equals("ACCEPTED", ignoreCase = true)
 
         Log.d(TAG, "Request decision notification received: $status for $visitorName")
-
-        // Sync data from server to refresh local lists
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                VmsRepository.getInstance(applicationContext).syncDataFromServer()
-            } catch (e: Exception) {
-                Log.w(TAG, "Sync error on decision: ${e.message}")
-            }
-        }
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = CHANNEL_ID_URGENT_ALERTS
@@ -256,11 +209,12 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 enableVibration(true)
+                description = "Security decisions and host verification responses"
             }
             notificationManager.createNotificationChannel(channel)
         }
 
-        val title = if (isApproved) "✅ Host Approved: $visitorName" else "❌ Host Declined: $visitorName"
+        val title = if (isApproved) "Host Approved: $visitorName" else "Host Declined: $visitorName"
         val body = if (isApproved) "Entry authorized. You may now print pass or grant gate entry." else "Host declined entry for this visitor."
 
         val mainIntent = Intent(this, MainActivity::class.java).apply {
@@ -271,7 +225,7 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
 
         val pendingIntent = PendingIntent.getActivity(
             this,
-            System.currentTimeMillis().toInt(),
+            requestId + 500,
             mainIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -286,9 +240,12 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
             .setContentIntent(pendingIntent)
             .build()
 
-        notificationManager.notify((System.currentTimeMillis() % 10000).toInt(), notification)
+        notificationManager.notify(requestId + 500, notification)
     }
 
+    /**
+     * Standard notification fallback for general updates
+     */
     private fun showStandardNotification(title: String, body: String, data: Map<String, String>) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = CHANNEL_ID_STANDARD
@@ -298,7 +255,9 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
                 channelId,
                 CHANNEL_NAME_STANDARD,
                 NotificationManager.IMPORTANCE_DEFAULT
-            )
+            ).apply {
+                description = "General notifications and appointment reminders"
+            }
             notificationManager.createNotificationChannel(channel)
         }
 
@@ -308,7 +267,7 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
 
         val pendingIntent = PendingIntent.getActivity(
             this,
-            System.currentTimeMillis().toInt(),
+            (System.currentTimeMillis() % 10000).toInt(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -317,6 +276,7 @@ class VmsFirebaseMessagingService : FirebaseMessagingService() {
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()

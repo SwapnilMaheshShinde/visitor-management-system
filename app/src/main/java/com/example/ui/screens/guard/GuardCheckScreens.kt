@@ -6,8 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -56,12 +58,13 @@ fun GuardQrScannerScreen(
             )
         },
         containerColor = DeepNavyDark,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -104,13 +107,15 @@ fun GuardOtpVerifyScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
                 .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -153,13 +158,14 @@ fun GuardInsideVisitorsScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         if (insideVisits.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -173,6 +179,7 @@ fun GuardInsideVisitorsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
@@ -285,13 +292,15 @@ fun GuardPendingRequestsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepNavyDark)
             )
         },
-        containerColor = SlateLightBackground
+        containerColor = SlateLightBackground,
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         if (requests.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -305,6 +314,7 @@ fun GuardPendingRequestsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)

@@ -105,12 +105,13 @@ fun NewWalkInScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),

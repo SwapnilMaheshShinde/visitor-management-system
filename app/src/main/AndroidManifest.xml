@@ -34,29 +34,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Full-Screen Incoming Visitor Phone Call Activity -->
-        <activity
-            android:name=".ui.screens.call.IncomingCallActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:showForAllUsers="true"
-            android:excludeFromRecents="true"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.MyApplication" />
-
-        <!-- Receiver for Notification Direct Accept/Decline Actions -->
-        <receiver
-            android:name=".service.IncomingCallActionReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.example.vms.ACTION_ACCEPT_CALL" />
-                <action android:name="com.example.vms.ACTION_DECLINE_CALL" />
-                <action android:name="com.example.vms.ACTION_CALL_DISMISSED" />
-            </intent-filter>
-        </receiver>
-
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.VmsFirebaseMessagingService"

@@ -153,17 +153,17 @@ async function sendTopicNotification(topic, title, body, data = {}) {
 }
 
 /**
- * Send High-Priority Incoming Visitor Call push notification
- * Uses data-only message with high priority to guarantee execution in Android onMessageReceived
- * even when the app is backgrounded or swiped away.
+ * Send High-Priority Professional Visitor Arrival Push Notification
+ * Delivers strong visitor arrival alerts to Employee host devices with high priority
+ * across all states (foreground, background, closed/swiped-away).
  */
-async function sendIncomingCallPush(tokens, callData = {}) {
+async function sendVisitorArrivalPush(tokens, arrivalData = {}) {
     if (!tokens || (Array.isArray(tokens) && tokens.length === 0)) {
         return { success: false, reason: 'NO_TOKENS' };
     }
 
     if (!fcmInitialized) {
-        console.warn(`[FCM] Incoming call push skipped: Firebase Admin not configured.`);
+        console.warn(`[FCM] Visitor arrival push skipped: Firebase Admin not configured.`);
         return { success: false, reason: 'FCM_NOT_CONFIGURED' };
     }
 
@@ -171,29 +171,40 @@ async function sendIncomingCallPush(tokens, callData = {}) {
     if (tokenList.length === 0) return { success: false, reason: 'NO_VALID_TOKENS' };
 
     const stringifiedData = {};
-    for (const [key, value] of Object.entries(callData || {})) {
+    for (const [key, value] of Object.entries(arrivalData || {})) {
         stringifiedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
     }
-    stringifiedData['type'] = 'INCOMING_VISITOR_CALL';
+    stringifiedData['type'] = 'VISITOR_ARRIVAL';
     stringifiedData['urgent'] = 'true';
-    stringifiedData['callTimestamp'] = String(Date.now());
+    stringifiedData['timestamp'] = String(Date.now());
+
+    const notifTitle = 'Visitor Arrival Request';
+    const notifBody = `${arrivalData.visitorName || 'Visitor'} (${arrivalData.visitorCompany || 'Visitor'}) arrived at ${arrivalData.gateName || 'Gate'}. Purpose: ${arrivalData.purpose || 'Official Visit'}`;
 
     const results = [];
     for (const token of tokenList) {
         try {
             const message = {
                 token: token,
+                notification: {
+                    title: notifTitle,
+                    body: notifBody
+                },
                 data: stringifiedData,
                 android: {
                     priority: 'high',
-                    ttl: 60 * 1000 // 60s TTL for active incoming call
+                    notification: {
+                        channelId: 'vms_visitor_arrivals',
+                        sound: 'default',
+                        priority: 'high'
+                    }
                 }
             };
             const response = await admin.messaging().send(message);
-            console.log(`[FCM] High-priority incoming call sent to token ${token.substring(0, 15)}... Message ID: ${response}`);
+            console.log(`[FCM] High-priority visitor arrival notification sent to token ${token.substring(0, 15)}... Message ID: ${response}`);
             results.push({ token, success: true, messageId: response });
         } catch (err) {
-            console.error(`[FCM] Error sending incoming call to token ${token.substring(0, 15)}...:`, err.message);
+            console.error(`[FCM] Error sending visitor arrival notification to token ${token.substring(0, 15)}...:`, err.message);
             results.push({ token, success: false, error: err.message });
         }
     }
@@ -204,7 +215,8 @@ async function sendIncomingCallPush(tokens, callData = {}) {
 module.exports = {
     sendPushNotification,
     sendTopicNotification,
-    sendIncomingCallPush,
+    sendVisitorArrivalPush,
+    sendIncomingCallPush: sendVisitorArrivalPush,
     isFcmInitialized: () => fcmInitialized
 };
 

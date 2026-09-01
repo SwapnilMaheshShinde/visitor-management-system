@@ -68,12 +68,13 @@ fun AdminDashboardScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
         ) {
             // Admin Navigation Tabs
             Surface(
@@ -436,10 +437,7 @@ fun AdminDashboardScreen(
 
                         if (adminUsers.isEmpty()) {
                             val defaultUsers = listOf(
-                                Triple("Swapnil Shinde", "Primary System Administrator (swapnilshinde538@gmail.com)", "ACTIVE"),
-                                Triple("Amit Verma", "Principal Tech Lead (amit.verma@vms.com)", "ACTIVE"),
-                                Triple("Priya Nair", "Head of HR (priya.nair@vms.com)", "ACTIVE"),
-                                Triple("Officer Vikram Singh", "Security Guard - Gate 1 (guard@vms.com)", "ACTIVE")
+                                Triple("Swapnil Shinde", "Primary System Administrator (swapnilshinde538@gmail.com)", "ACTIVE")
                             )
                             items(defaultUsers) { u ->
                                 Surface(

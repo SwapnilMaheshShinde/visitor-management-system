@@ -57,12 +57,13 @@ fun EmployeeAppointmentsScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
                 .imePadding()
                 .padding(horizontal = 16.dp)
         ) {
@@ -146,22 +147,37 @@ fun EmployeeAppointmentsScreen(
     }
 
     if (selectedApptForPass != null) {
-        Dialog(onDismissRequest = { selectedApptForPass = null }) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                QrPassVisualizer(
-                    visitorName = selectedApptForPass!!.visitorName,
-                    otpCode = selectedApptForPass!!.otpCode,
-                    qrToken = selectedApptForPass!!.qrToken,
-                    hostName = selectedApptForPass!!.hostName,
-                    expectedTime = selectedApptForPass!!.expectedDateTime
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = { selectedApptForPass = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = DeepNavyDark),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Close Pass", color = Color.White)
+        Dialog(
+            onDismissRequest = { selectedApptForPass = null },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    QrPassVisualizer(
+                        visitorName = selectedApptForPass!!.visitorName,
+                        otpCode = selectedApptForPass!!.otpCode,
+                        qrToken = selectedApptForPass!!.qrToken,
+                        hostName = selectedApptForPass!!.hostName,
+                        expectedTime = com.example.utils.DateTimeUtils.formatDisplayDateTime(selectedApptForPass!!.expectedDateTime)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = { selectedApptForPass = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = DeepNavyDark),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Close Pass", color = Color.White)
+                    }
                 }
             }
         }
@@ -192,13 +208,14 @@ fun EmployeeHistoryScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         if (visits.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -212,6 +229,7 @@ fun EmployeeHistoryScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)

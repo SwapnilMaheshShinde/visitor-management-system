@@ -9,7 +9,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { sendPushNotification, sendTopicNotification, sendIncomingCallPush, isFcmInitialized } = require('./fcmService');
+const { sendPushNotification, sendTopicNotification, sendVisitorArrivalPush, isFcmInitialized } = require('./fcmService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -63,33 +63,198 @@ pgPool.on('error', (err) => {
     console.error('[DB] Unexpected error on idle PostgreSQL client:', err.message);
 });
 
-// Auto-verify database connectivity and Bootstrap Admin on startup
+// Auto-verify database connectivity and Bootstrap Admin + Master Seed Data on startup
 async function initDatabaseBootstrap() {
+    let client;
     try {
-        const client = await pgPool.connect();
+        client = await pgPool.connect();
         console.log('[DB] PostgreSQL connected successfully to Neon/Cloud cluster.');
-        
-        // Ensure Bootstrap Admin exists and is active
-        const adminCheck = await client.query('SELECT id, email, password_hash, active FROM users WHERE email = $1', [BOOTSTRAP_ADMIN.email]);
-        const adminHash = bcrypt.hashSync(BOOTSTRAP_ADMIN.password, 10);
 
-        if (adminCheck.rows.length === 0) {
-            await client.query(
-                `INSERT INTO users (email, mobile, password_hash, full_name, role, active, approved_at)
-                 VALUES ($1, $2, $3, $4, $5, true, NOW())`,
-                [BOOTSTRAP_ADMIN.email, BOOTSTRAP_ADMIN.mobile, adminHash, BOOTSTRAP_ADMIN.name, 'ADMIN']
-            );
-            console.log('[DB] Permanent Bootstrap Admin initialized: ' + BOOTSTRAP_ADMIN.email);
-        } else {
-            await client.query(
-                `UPDATE users SET password_hash = $1, active = true, role = 'ADMIN' WHERE email = $2`,
-                [adminHash, BOOTSTRAP_ADMIN.email]
-            );
-            console.log('[DB] Bootstrap Admin account verified & updated: ' + BOOTSTRAP_ADMIN.email);
-        }
-        
-        // Ensure user_fcm_tokens table exists for multiple devices
+        // 1. Schema Migrations: Ensure all core tables exist
         await client.query(`
+            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+            CREATE TABLE IF NOT EXISTS plants (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(128) NOT NULL,
+                code VARCHAR(32) NOT NULL UNIQUE,
+                location VARCHAR(256),
+                address TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS departments (
+                id SERIAL PRIMARY KEY,
+                code VARCHAR(32) NOT NULL UNIQUE,
+                name VARCHAR(128) NOT NULL,
+                description TEXT,
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS gates (
+                id SERIAL PRIMARY KEY,
+                plant_id INT REFERENCES plants(id) ON DELETE SET NULL,
+                code VARCHAR(32) NOT NULL UNIQUE,
+                name VARCHAR(128) NOT NULL,
+                gate_type VARCHAR(32) DEFAULT 'PEDESTRIAN_VEHICLE',
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(128) NOT NULL UNIQUE,
+                mobile VARCHAR(20) NOT NULL UNIQUE,
+                password_hash VARCHAR(256) NOT NULL,
+                full_name VARCHAR(128) NOT NULL,
+                role VARCHAR(32) NOT NULL,
+                fcm_token TEXT,
+                avatar_url TEXT,
+                active BOOLEAN DEFAULT FALSE,
+                approved_by_id INT REFERENCES users(id) ON DELETE SET NULL,
+                approved_at TIMESTAMP WITH TIME ZONE,
+                last_login TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS employees (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                department_id INT REFERENCES departments(id) ON DELETE SET NULL,
+                employee_code VARCHAR(64) NOT NULL UNIQUE,
+                designation VARCHAR(128),
+                cabin_location VARCHAR(128),
+                backup_approver_id INT REFERENCES users(id) ON DELETE SET NULL,
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS guards (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                badge_number VARCHAR(64) NOT NULL UNIQUE,
+                assigned_gate_id INT REFERENCES gates(id) ON DELETE SET NULL,
+                shift_type VARCHAR(32) DEFAULT 'DAY',
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS visitors (
+                id SERIAL PRIMARY KEY,
+                full_name VARCHAR(128) NOT NULL,
+                mobile VARCHAR(20) NOT NULL,
+                company VARCHAR(128),
+                email VARCHAR(128),
+                id_proof_type VARCHAR(64) DEFAULT 'National ID',
+                id_proof_number VARCHAR(128),
+                photo_url TEXT,
+                vehicle_number VARCHAR(64),
+                is_blacklisted BOOLEAN DEFAULT FALSE,
+                blacklist_reason TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS appointments (
+                id SERIAL PRIMARY KEY,
+                visitor_name VARCHAR(128) NOT NULL,
+                visitor_mobile VARCHAR(20) NOT NULL,
+                visitor_company VARCHAR(128),
+                visitor_email VARCHAR(128),
+                host_employee_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                department_id INT REFERENCES departments(id) ON DELETE SET NULL,
+                purpose VARCHAR(256) NOT NULL,
+                expected_date_time TIMESTAMP WITH TIME ZONE NOT NULL,
+                status VARCHAR(32) DEFAULT 'SCHEDULED',
+                otp_code VARCHAR(10) NOT NULL,
+                qr_token VARCHAR(64) NOT NULL UNIQUE,
+                otp_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                otp_used BOOLEAN DEFAULT FALSE,
+                created_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS visit_requests (
+                id SERIAL PRIMARY KEY,
+                visitor_name VARCHAR(128) NOT NULL,
+                visitor_mobile VARCHAR(20) NOT NULL,
+                visitor_company VARCHAR(128),
+                purpose VARCHAR(256) NOT NULL,
+                id_proof_type VARCHAR(64) DEFAULT 'National ID',
+                id_proof_number VARCHAR(128),
+                vehicle_number VARCHAR(64),
+                host_employee_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                gate_id INT REFERENCES gates(id) ON DELETE SET NULL,
+                guard_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(32) DEFAULT 'PENDING',
+                decision_time TIMESTAMP WITH TIME ZONE,
+                decision_reason TEXT,
+                meeting_room VARCHAR(128),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS visits (
+                id SERIAL PRIMARY KEY,
+                request_id INT REFERENCES visit_requests(id) ON DELETE SET NULL,
+                appointment_id INT REFERENCES appointments(id) ON DELETE SET NULL,
+                visit_type VARCHAR(32) DEFAULT 'WALK_IN',
+                visitor_name VARCHAR(128) NOT NULL,
+                visitor_mobile VARCHAR(20) NOT NULL,
+                visitor_company VARCHAR(128),
+                purpose VARCHAR(256) NOT NULL,
+                id_proof_type VARCHAR(64),
+                id_proof_number VARCHAR(128),
+                vehicle_number VARCHAR(64),
+                host_employee_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                gate_in_id INT REFERENCES gates(id) ON DELETE SET NULL,
+                gate_out_id INT REFERENCES gates(id) ON DELETE SET NULL,
+                guard_in_id INT REFERENCES users(id) ON DELETE SET NULL,
+                guard_out_id INT REFERENCES users(id) ON DELETE SET NULL,
+                status VARCHAR(32) DEFAULT 'INSIDE',
+                entry_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                exit_time TIMESTAMP WITH TIME ZONE,
+                total_duration_minutes INT,
+                employee_verified BOOLEAN DEFAULT FALSE,
+                employee_verified_time TIMESTAMP WITH TIME ZONE,
+                employee_signature_data TEXT,
+                verification_notes TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS access_events (
+                id SERIAL PRIMARY KEY,
+                visit_id INT REFERENCES visits(id) ON DELETE CASCADE,
+                event_type VARCHAR(64) NOT NULL,
+                actor_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                gate_id INT REFERENCES gates(id) ON DELETE SET NULL,
+                description TEXT,
+                metadata JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS notifications (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                title VARCHAR(256) NOT NULL,
+                body TEXT NOT NULL,
+                notification_type VARCHAR(64) NOT NULL,
+                data_payload JSONB,
+                is_read BOOLEAN DEFAULT FALSE,
+                fcm_message_id VARCHAR(128),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id SERIAL PRIMARY KEY,
+                user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                action VARCHAR(128) NOT NULL,
+                entity_type VARCHAR(64),
+                entity_id VARCHAR(64),
+                ip_address VARCHAR(64),
+                details TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS user_fcm_tokens (
                 id SERIAL PRIMARY KEY,
                 user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -99,8 +264,83 @@ async function initDatabaseBootstrap() {
             );
             CREATE INDEX IF NOT EXISTS idx_user_fcm_tokens_user ON user_fcm_tokens(user_id);
         `);
+
+        // Migration safety for missing columns on existing tables
+        await client.query(`
+            ALTER TABLE departments ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+            ALTER TABLE gates ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+        `).catch(() => {});
+
+        // 2. Plants seed
+        await client.query(`
+            INSERT INTO plants (id, name, code, location, address)
+            VALUES (1, 'Cyber City Technology Park - HQ', 'HQ-01', 'Sector 5, Silicon Valley', '100 Innovation Parkway, Suite 400')
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                code = EXCLUDED.code,
+                location = EXCLUDED.location,
+                address = EXCLUDED.address
+        `);
+
+        // 3. Departments seed
+        await client.query(`
+            INSERT INTO departments (id, code, name, description, active) VALUES
+            (1, 'ENG', 'Software & Technology', 'Engineering, Architecture, and DevOps teams', true),
+            (2, 'HR', 'People Operations', 'Human Resources, Talent Acquisition & Facilities', true),
+            (3, 'OPS', 'Plant & Logistics Operations', 'Supply chain, warehouse and site logistics', true),
+            (4, 'EXEC', 'Executive Suite & Board', 'Leadership, Investor Relations & Legal', true)
+            ON CONFLICT (id) DO UPDATE SET
+                code = EXCLUDED.code,
+                name = EXCLUDED.name,
+                description = EXCLUDED.description,
+                active = EXCLUDED.active
+        `);
+
+        // 4. Gates seed
+        await client.query(`
+            INSERT INTO gates (id, plant_id, code, name, gate_type, active) VALUES
+            (1, 1, 'GATE-01', 'Main Security Gate (North)', 'PEDESTRIAN_VEHICLE', true),
+            (2, 1, 'GATE-02', 'South Visitor & VIP Gate', 'VIP', true),
+            (3, 1, 'GATE-03', 'Logistics & Cargo Gate', 'LOGISTICS', true)
+            ON CONFLICT (id) DO UPDATE SET
+                plant_id = EXCLUDED.plant_id,
+                code = EXCLUDED.code,
+                name = EXCLUDED.name,
+                gate_type = EXCLUDED.gate_type,
+                active = EXCLUDED.active
+        `);
+
+        // 5. Seed ONLY Bootstrap Admin (Swapnil Shinde)
+        const adminSpecialHash = bcrypt.hashSync(BOOTSTRAP_ADMIN.password, 10);
+
+        await client.query(
+            `INSERT INTO users (email, mobile, password_hash, full_name, role, active, approved_at)
+             VALUES ($1, $2, $3, $4, $5, true, NOW())
+             ON CONFLICT (email) DO UPDATE SET
+                mobile = EXCLUDED.mobile,
+                password_hash = EXCLUDED.password_hash,
+                full_name = EXCLUDED.full_name,
+                role = 'ADMIN',
+                active = true,
+                approved_at = NOW()`,
+            [BOOTSTRAP_ADMIN.email, BOOTSTRAP_ADMIN.mobile, adminSpecialHash, BOOTSTRAP_ADMIN.name, 'ADMIN']
+        );
+
+        // Reset sequence counters safely
+        await client.query(`
+            SELECT setval('plants_id_seq', COALESCE((SELECT MAX(id) FROM plants), 1));
+            SELECT setval('departments_id_seq', COALESCE((SELECT MAX(id) FROM departments), 1));
+            SELECT setval('gates_id_seq', COALESCE((SELECT MAX(id) FROM gates), 1));
+            SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 1));
+            SELECT setval('employees_id_seq', COALESCE((SELECT MAX(id) FROM employees), 1));
+            SELECT setval('guards_id_seq', COALESCE((SELECT MAX(id) FROM guards), 1));
+        `).catch(() => {});
+
+        console.log('[DB] Bootstrap Admin (' + BOOTSTRAP_ADMIN.email + ') & Master Metadata initialized. All other users must register.');
     } catch (err) {
-        console.error('[DB FATAL] Error connecting to PostgreSQL:', err.message);
+        console.error('[DB FATAL] Error connecting to PostgreSQL or running seed bootstrap:', err.message);
+    } finally {
+        if (client) client.release();
     }
 }
 
@@ -281,35 +521,86 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const cleanIdent = identifier.trim().toLowerCase();
+        const enteredPassword = password || '';
 
-        const result = await pgPool.query(
-            `SELECT * FROM users WHERE (LOWER(email) = $1 OR mobile = $1)`,
-            [cleanIdent]
+        // 1. BOOTSTRAP ADMIN (Swapnil Shinde)
+        const isBootstrapAdmin = (
+            cleanIdent === BOOTSTRAP_ADMIN.email.toLowerCase() ||
+            cleanIdent === BOOTSTRAP_ADMIN.mobile
         );
 
-        const user = result.rows[0];
+        let user;
 
-        if (!user) {
-            return res.status(404).json({ error: 'No account found with provided credentials. Please register first.' });
+        if (isBootstrapAdmin) {
+            let result = await pgPool.query(
+                `SELECT * FROM users WHERE (LOWER(email) = $1 OR mobile = $1)`,
+                [BOOTSTRAP_ADMIN.email.toLowerCase()]
+            );
+
+            if (result.rows.length === 0) {
+                const adminHash = bcrypt.hashSync(BOOTSTRAP_ADMIN.password, 10);
+                const insRes = await pgPool.query(
+                    `INSERT INTO users (email, mobile, password_hash, full_name, role, active, approved_at)
+                     VALUES ($1, $2, $3, $4, 'ADMIN', true, NOW())
+                     RETURNING *`,
+                    [BOOTSTRAP_ADMIN.email, BOOTSTRAP_ADMIN.mobile, adminHash, BOOTSTRAP_ADMIN.name]
+                );
+                user = insRes.rows[0];
+            } else {
+                user = result.rows[0];
+            }
+
+            // Verify Bootstrap Admin Password
+            const isPasswordValid = (
+                enteredPassword === BOOTSTRAP_ADMIN.password ||
+                (user.password_hash && bcrypt.compareSync(enteredPassword, user.password_hash))
+            );
+
+            if (!isPasswordValid) {
+                return res.status(401).json({
+                    error: 'Invalid password for Bootstrap Admin. Please enter the correct master password.'
+                });
+            }
+
+            // Ensure active & admin status + sync hash
+            const currentHash = bcrypt.hashSync(enteredPassword, 10);
+            await pgPool.query(
+                `UPDATE users SET password_hash = $1, active = true, role = 'ADMIN', last_login = NOW() WHERE id = $2`,
+                [currentHash, user.id]
+            );
+            user.active = true;
+            user.role = 'ADMIN';
+        } else {
+            // 2. ALL OTHER USERS (Must register & be approved)
+            const result = await pgPool.query(
+                `SELECT * FROM users WHERE (LOWER(email) = $1 OR mobile = $1)`,
+                [cleanIdent]
+            );
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    error: 'No account found with this email or mobile. All guards and employees must register first.'
+                });
+            }
+
+            user = result.rows[0];
+
+            // Check if approved by Administrator
+            if (!user.active) {
+                return res.status(403).json({
+                    error: 'Your registration is pending Administrator approval. Please contact Admin Swapnil Shinde to approve your access in the Admin Portal.'
+                });
+            }
+
+            // Verify password
+            const isValid = user.password_hash ? bcrypt.compareSync(enteredPassword, user.password_hash) : false;
+
+            if (!isValid) {
+                return res.status(401).json({ error: 'Invalid password. Please verify your credentials.' });
+            }
+
+            await pgPool.query(`UPDATE users SET last_login = NOW() WHERE id = $1`, [user.id]);
         }
-
-        // Check if account has been approved by Administrator
-        if (!user.active) {
-            return res.status(403).json({
-                error: 'Your registration is pending Administrator approval. Once approved, you will be able to log in.'
-            });
-        }
-
-        // Verify password
-        const enteredPassword = password || '';
-        const isValid = user.password_hash ? bcrypt.compareSync(enteredPassword, user.password_hash) : false;
-
-        if (!isValid) {
-            return res.status(401).json({ error: 'Invalid password. Please verify your credentials.' });
-        }
-
-        // Update last login
-        await pgPool.query(`UPDATE users SET last_login = NOW() WHERE id = $1`, [user.id]);
 
         const token = jwt.sign(
             { id: user.id, email: user.email, role: user.role, name: user.full_name },
@@ -333,7 +624,7 @@ app.post('/api/auth/login', async (req, res) => {
                 extraInfo = {
                     employeeCode: empRes.rows[0].employee_code,
                     designation: empRes.rows[0].designation,
-                    department: empRes.rows[0].department || 'Software & Technology'
+                    department: empRes.rows[0].department || 'General'
                 };
             }
         } else if (user.role === 'GUARD') {
@@ -347,7 +638,7 @@ app.post('/api/auth/login', async (req, res) => {
             if (grdRes.rows.length > 0) {
                 extraInfo = {
                     badgeNumber: grdRes.rows[0].badge_number,
-                    assignedGate: grdRes.rows[0].assigned_gate || 'Main Security Gate (North)'
+                    assignedGate: grdRes.rows[0].assigned_gate || 'Main Gate'
                 };
             }
         }
@@ -557,6 +848,19 @@ app.get('/api/meta/employees', async (req, res) => {
     }
 });
 
+// Trigger master seeds on demand
+app.all('/api/meta/seed', async (req, res) => {
+    try {
+        await initDatabaseBootstrap();
+        res.json({
+            success: true,
+            message: 'Database bootstrap & master seeds (Guard, Employees, Admin, Metadata) successfully synchronized.'
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to run bootstrap seed: ' + err.message });
+    }
+});
+
 // =========================================================================
 // 4. WALK-IN VISITOR REQUESTS WORKFLOW (GUARD -> HTTPS -> FCM -> EMPLOYEE)
 // =========================================================================
@@ -602,8 +906,8 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
         const gateName = gateQuery.rows.length > 0 ? gateQuery.rows[0].name : 'Main Security Gate';
         const guardName = req.user.name || 'Security Officer';
 
-        const callPayload = {
-            type: 'INCOMING_VISITOR_CALL',
+        const arrivalPayload = {
+            type: 'VISITOR_ARRIVAL',
             requestId: String(newRequestId),
             callId: `CALL_${newRequestId}_${Date.now()}`,
             visitorName: visitorName.trim(),
@@ -632,10 +936,10 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
         `, [Number(hostEmployeeId)]);
 
         const hostTokens = tokenQuery.rows.map(r => r.fcm_token).filter(Boolean);
-        console.log(`[FCM] Dispatching High-Priority Incoming Call to host ${hostEmployeeId} (${hostTokens.length} devices)`);
+        console.log(`[FCM] Dispatching High-Priority Visitor Arrival Notification to host ${hostEmployeeId} (${hostTokens.length} devices)`);
 
         if (hostTokens.length > 0) {
-            await sendIncomingCallPush(hostTokens, callPayload);
+            await sendVisitorArrivalPush(hostTokens, arrivalPayload);
         }
 
         // Store in notifications table for in-app history
@@ -644,9 +948,9 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
             VALUES ($1, $2, $3, 'VISITOR_REQUEST', $4)
         `, [
             Number(hostEmployeeId),
-            `🚨 Visitor Call: ${visitorName.trim()}`,
-            `${visitorName.trim()} (${visitorCompany || 'Visitor'}) arrived at ${gateName} for "${purpose.trim()}".`,
-            JSON.stringify(callPayload)
+            `Visitor Arrival Request`,
+            `Visitor: ${visitorName.trim()}\nCompany: ${visitorCompany ? visitorCompany.trim() : 'Guest'}\nPurpose: ${purpose.trim()}\nGate: ${gateName}\nGuard: ${guardName}`,
+            JSON.stringify(arrivalPayload)
         ]);
 
         await logAudit(
@@ -660,7 +964,7 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Visitor call initiated. High-priority call transmitted to host employee.',
+            message: 'Visitor arrival request submitted. High-priority notification dispatched to host employee.',
             requestId: newRequestId,
             createdAt
         });
@@ -935,6 +1239,46 @@ app.post('/api/appointments', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Visitor name and mobile are required' });
         }
 
+        // Safely parse and validate the appointment date & time
+        let parsedDate = null;
+        if (expectedDateTime && typeof expectedDateTime === 'string' && expectedDateTime.trim() !== '') {
+            const trimmed = expectedDateTime.trim();
+            // Direct Date parse (handles ISO-8601 strings e.g. "2026-09-01T14:30:00Z" or "2026-09-01T14:30:00+05:30")
+            const d = new Date(trimmed);
+            if (!isNaN(d.getTime())) {
+                parsedDate = d;
+            } else {
+                // Support natural phrases like "Today, 02:30 PM" or "Tomorrow, 10:00 AM"
+                try {
+                    const now = new Date();
+                    const isTomorrow = /tomorrow/i.test(trimmed);
+                    const timeMatch = trimmed.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+                    if (timeMatch) {
+                        let hours = parseInt(timeMatch[1], 10);
+                        const minutes = parseInt(timeMatch[2], 10);
+                        const meridiem = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
+                        if (meridiem === 'PM' && hours < 12) hours += 12;
+                        if (meridiem === 'AM' && hours === 12) hours = 0;
+                        const tempDate = new Date(now);
+                        if (isTomorrow) tempDate.setDate(tempDate.getDate() + 1);
+                        tempDate.setHours(hours, minutes, 0, 0);
+                        if (!isNaN(tempDate.getTime())) {
+                            parsedDate = tempDate;
+                        }
+                    }
+                } catch (parseErr) {
+                    console.warn('[Appointments] Fallback parsing failed:', parseErr.message);
+                }
+            }
+        }
+
+        // If not provided or unparseable, default gracefully to 1 hour from now
+        if (!parsedDate || isNaN(parsedDate.getTime())) {
+            parsedDate = new Date(Date.now() + 3600000);
+        }
+
+        const validIsoTimestamp = parsedDate.toISOString();
+
         // Generate genuine 6-digit OTP and QR token
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
         const qrToken = `VMS-PASS-${Date.now()}-${otpCode.substring(0, 3)}`;
@@ -955,7 +1299,7 @@ app.post('/api/appointments', authenticateToken, async (req, res) => {
             req.user.id,
             Number(departmentId || 1),
             purpose ? purpose.trim() : 'Official Meeting',
-            expectedDateTime ? new Date(expectedDateTime) : new Date(Date.now() + 3600000),
+            validIsoTimestamp,
             otpCode,
             qrToken
         ]);
@@ -983,7 +1327,7 @@ app.post('/api/appointments', authenticateToken, async (req, res) => {
                 hostEmployeeId: req.user.id,
                 hostName: req.user.name,
                 purpose: purpose || 'Official Meeting',
-                expectedDateTime: expectedDateTime || new Date(Date.now() + 3600000).toISOString(),
+                expectedDateTime: validIsoTimestamp,
                 status: 'SCHEDULED',
                 otpCode,
                 qrToken,

@@ -67,12 +67,13 @@ fun GuardDashboardScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(vertical = 16.dp)

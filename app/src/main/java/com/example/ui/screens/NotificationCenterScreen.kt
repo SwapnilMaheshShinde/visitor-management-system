@@ -47,13 +47,14 @@ fun NotificationCenterScreen(
             )
         },
         containerColor = SlateLightBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
         if (notifications.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -68,6 +69,7 @@ fun NotificationCenterScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .consumeWindowInsets(padding)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)

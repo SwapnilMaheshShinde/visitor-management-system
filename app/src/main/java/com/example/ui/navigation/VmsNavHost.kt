@@ -89,7 +89,7 @@ fun VmsNavHost(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        contentWindowInsets = WindowInsets.safeDrawing
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Box(
             modifier = Modifier

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,10 +49,10 @@ fun LoginScreen(
 ) {
     var isRegisterMode by remember { mutableStateOf(false) }
 
-    // Sign-in states
-    var selectedRole by remember { mutableStateOf(Role.GUARD) }
-    var identifier by remember { mutableStateOf("guard@vms.com") }
-    var password by remember { mutableStateOf("password123") }
+    // Sign-in states - Default to Bootstrap Admin
+    var selectedRole by remember { mutableStateOf(Role.ADMIN) }
+    var identifier by remember { mutableStateOf("swapnilshinde538@gmail.com") }
+    var password by remember { mutableStateOf("12345678@Ss") }
 
     // Registration states
     var regName by remember { mutableStateOf("") }
@@ -67,17 +68,17 @@ fun LoginScreen(
     LaunchedEffect(selectedRole) {
         if (!isRegisterMode) {
             when (selectedRole) {
-                Role.GUARD -> {
-                    identifier = "guard@vms.com"
-                    password = "password123"
-                }
-                Role.EMPLOYEE -> {
-                    identifier = "amit.verma@vms.com"
-                    password = "password123"
-                }
                 Role.ADMIN -> {
                     identifier = "swapnilshinde538@gmail.com"
                     password = "12345678@Ss"
+                }
+                Role.GUARD -> {
+                    identifier = ""
+                    password = ""
+                }
+                Role.EMPLOYEE -> {
+                    identifier = ""
+                    password = ""
                 }
             }
         }
@@ -85,12 +86,13 @@ fun LoginScreen(
 
     Scaffold(
         containerColor = DeepNavyDark,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 20.dp),
@@ -358,9 +360,9 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Fast profile switchers for easy verification across multiple roles
+                // Bootstrap Admin Master Control & Quick Access
                 Text(
-                    text = "BOOTSTRAP & FAST VERIFICATION PROFILES",
+                    text = "MASTER BOOTSTRAP ADMINISTRATOR",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = Color.White.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Bold,
@@ -369,9 +371,9 @@ fun LoginScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Primary Bootstrap Admin
+                // Primary Bootstrap Admin Card
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = NavyCard,
@@ -385,50 +387,59 @@ fun LoginScreen(
                         }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(12.dp)
+                                .size(14.dp)
                                 .clip(CircleShape)
                                 .background(AccentCyanGlow)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Swapnil Shinde (Primary Bootstrap Admin)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("swapnilshinde538@gmail.com • Full Master Control", color = SlateLightTextSecondary, fontSize = 10.sp)
+                            Text("Swapnil Shinde (Bootstrap Admin)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("swapnilshinde538@gmail.com • Approves new Guards & Staff", color = SlateLightTextSecondary, fontSize = 11.sp)
                         }
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, tint = AccentCyanGlow, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.ArrowForward, contentDescription = "Log in as Admin", tint = AccentCyanGlow, modifier = Modifier.size(18.dp))
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // New Staff / Guard Registration Prompt Card
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = SlateLightCard.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            isRegisterMode = true
+                        }
                 ) {
-                    DemoProfileChip(
-                        name = "Officer Vikram",
-                        role = "Guard (Gate 1)",
-                        color = AccentBlue,
-                        onClick = {
-                            selectedRole = Role.GUARD
-                            onLogin("guard@vms.com", "password123", Role.GUARD)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    DemoProfileChip(
-                        name = "Amit Verma",
-                        role = "Employee (Host)",
-                        color = StatusApprovedGreen,
-                        onClick = {
-                            selectedRole = Role.EMPLOYEE
-                            onLogin("amit.verma@vms.com", "password123", Role.EMPLOYEE)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.PersonAdd,
+                            contentDescription = null,
+                            tint = AccentBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Need Guard or Employee Access?", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            Text("Register your account to request Admin approval.", color = SlateLightTextSecondary, fontSize = 10.sp)
+                        }
+                        Text(
+                            "Register",
+                            color = AccentCyanGlow,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             } else {
                 // REGISTRATION FORM
@@ -650,38 +661,6 @@ private fun RoleTabItem(
                     fontSize = 12.sp
                 )
             )
-        }
-    }
-}
-
-@Composable
-private fun DemoProfileChip(
-    name: String,
-    role: String,
-    color: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = NavyCard,
-        modifier = modifier.clickable { onClick() }
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(color)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
-                Text(role, color = SlateLightTextSecondary, fontSize = 9.sp, maxLines = 1)
-            }
         }
     }
 }
