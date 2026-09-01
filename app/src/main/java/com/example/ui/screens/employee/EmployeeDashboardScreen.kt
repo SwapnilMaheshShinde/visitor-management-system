@@ -1,5 +1,6 @@
 package com.example.ui.screens.employee
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.*
 import com.example.ui.components.*
+import com.example.ui.screens.call.IncomingCallActivity
 import com.example.ui.theme.*
 
 @Composable
@@ -117,6 +120,69 @@ fun EmployeeDashboardScreen(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
+                    }
+                }
+            }
+
+            // Incoming Visitor Call System Readiness & Simulator Card
+            item {
+                val context = LocalContext.current
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF0F172A),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF06B6D4).copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val testIntent = Intent(context, IncomingCallActivity::class.java).apply {
+                                putExtra(IncomingCallActivity.EXTRA_REQUEST_ID, 9999)
+                                putExtra(IncomingCallActivity.EXTRA_CALL_ID, "TEST_CALL_${System.currentTimeMillis()}")
+                                putExtra(IncomingCallActivity.EXTRA_VISITOR_NAME, "Vikram Malhotra")
+                                putExtra(IncomingCallActivity.EXTRA_VISITOR_MOBILE, "+91 98877 66554")
+                                putExtra(IncomingCallActivity.EXTRA_VISITOR_COMPANY, "Alphabet Inc.")
+                                putExtra(IncomingCallActivity.EXTRA_PURPOSE, "Security & Architecture Review")
+                                putExtra(IncomingCallActivity.EXTRA_GATE_NAME, "North Executive Gate")
+                                putExtra(IncomingCallActivity.EXTRA_GUARD_NAME, "Officer Ramesh (Guard 1)")
+                                putExtra(IncomingCallActivity.EXTRA_VEHICLE_NUMBER, "KA 05 MN 4421")
+                                putExtra(IncomingCallActivity.EXTRA_ID_PROOF_TYPE, "Aadhaar / ID Card")
+                                putExtra(IncomingCallActivity.EXTRA_ID_PROOF_NUMBER, "XXXX-8821")
+                            }
+                            context.startActivity(testIntent)
+                        }
+                        .testTag("test_incoming_call_button")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF06B6D4).copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.PhoneInTalk, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Incoming Visitor Calls: Active", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF10B981))
+                                )
+                            }
+                            Text(
+                                "Tap to preview full-screen incoming ringtone & vibration UI",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 11.sp
+                            )
+                        }
+                        Icon(Icons.Default.PlayCircle, contentDescription = "Test Call", tint = Color(0xFF38BDF8), modifier = Modifier.size(22.dp))
                     }
                 }
             }

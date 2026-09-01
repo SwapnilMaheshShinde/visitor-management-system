@@ -152,8 +152,59 @@ async function sendTopicNotification(topic, title, body, data = {}) {
     }
 }
 
+/**
+ * Send High-Priority Incoming Visitor Call push notification
+ * Uses data-only message with high priority to guarantee execution in Android onMessageReceived
+ * even when the app is backgrounded or swiped away.
+ */
+async function sendIncomingCallPush(tokens, callData = {}) {
+    if (!tokens || (Array.isArray(tokens) && tokens.length === 0)) {
+        return { success: false, reason: 'NO_TOKENS' };
+    }
+
+    if (!fcmInitialized) {
+        console.warn(`[FCM] Incoming call push skipped: Firebase Admin not configured.`);
+        return { success: false, reason: 'FCM_NOT_CONFIGURED' };
+    }
+
+    const tokenList = Array.isArray(tokens) ? tokens.filter(Boolean) : [tokens].filter(Boolean);
+    if (tokenList.length === 0) return { success: false, reason: 'NO_VALID_TOKENS' };
+
+    const stringifiedData = {};
+    for (const [key, value] of Object.entries(callData || {})) {
+        stringifiedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    }
+    stringifiedData['type'] = 'INCOMING_VISITOR_CALL';
+    stringifiedData['urgent'] = 'true';
+    stringifiedData['callTimestamp'] = String(Date.now());
+
+    const results = [];
+    for (const token of tokenList) {
+        try {
+            const message = {
+                token: token,
+                data: stringifiedData,
+                android: {
+                    priority: 'high',
+                    ttl: 60 * 1000 // 60s TTL for active incoming call
+                }
+            };
+            const response = await admin.messaging().send(message);
+            console.log(`[FCM] High-priority incoming call sent to token ${token.substring(0, 15)}... Message ID: ${response}`);
+            results.push({ token, success: true, messageId: response });
+        } catch (err) {
+            console.error(`[FCM] Error sending incoming call to token ${token.substring(0, 15)}...:`, err.message);
+            results.push({ token, success: false, error: err.message });
+        }
+    }
+
+    return { success: results.some(r => r.success), results };
+}
+
 module.exports = {
     sendPushNotification,
     sendTopicNotification,
+    sendIncomingCallPush,
     isFcmInitialized: () => fcmInitialized
 };
+

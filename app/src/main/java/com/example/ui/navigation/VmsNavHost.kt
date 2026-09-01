@@ -55,6 +55,7 @@ fun VmsNavHost(
     val stats by viewModel.stats.collectAsState()
     val pendingUsers by viewModel.pendingUsers.collectAsState()
     val adminUsers by viewModel.adminUsers.collectAsState()
+    val availableEmployees by viewModel.availableEmployees.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -162,6 +163,7 @@ fun VmsNavHost(
                 composable(Screen.GuardNewWalkIn.route) {
                     NewWalkInScreen(
                         isLoading = isLoading,
+                        availableEmployees = availableEmployees,
                         onSubmit = { name, mob, comp, purp, idType, idNum, veh, hostId, hostName, gateId, gateName ->
                             viewModel.submitWalkIn(name, mob, comp, purp, idType, idNum, veh, hostId, hostName, gateId, gateName) {
                                 navController.popBackStack()

@@ -9,7 +9,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { sendPushNotification, sendTopicNotification, isFcmInitialized } = require('./fcmService');
+const { sendPushNotification, sendTopicNotification, sendIncomingCallPush, isFcmInitialized } = require('./fcmService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -88,7 +88,17 @@ async function initDatabaseBootstrap() {
             console.log('[DB] Bootstrap Admin account verified & updated: ' + BOOTSTRAP_ADMIN.email);
         }
         
-        client.release();
+        // Ensure user_fcm_tokens table exists for multiple devices
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_fcm_tokens (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                fcm_token TEXT NOT NULL UNIQUE,
+                device_name VARCHAR(128),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_fcm_tokens_user ON user_fcm_tokens(user_id);
+        `);
     } catch (err) {
         console.error('[DB FATAL] Error connecting to PostgreSQL:', err.message);
     }
@@ -363,7 +373,7 @@ app.post('/api/auth/login', async (req, res) => {
 // Register FCM Device Token
 app.post('/api/auth/register-fcm', authenticateToken, async (req, res) => {
     try {
-        const { fcmToken } = req.body;
+        const { fcmToken, deviceName } = req.body;
         const userId = req.user.id;
 
         if (!fcmToken) {
@@ -371,6 +381,12 @@ app.post('/api/auth/register-fcm', authenticateToken, async (req, res) => {
         }
 
         await pgPool.query(`UPDATE users SET fcm_token = $1 WHERE id = $2`, [fcmToken, userId]);
+        await pgPool.query(`
+            INSERT INTO user_fcm_tokens (user_id, fcm_token, device_name, updated_at)
+            VALUES ($1, $2, $3, NOW())
+            ON CONFLICT (fcm_token) DO UPDATE SET user_id = $1, device_name = $3, updated_at = NOW()
+        `, [userId, fcmToken, deviceName || 'Android Device']);
+
         console.log(`[FCM] Registered token for user ${userId}: ${fcmToken.substring(0, 15)}...`);
         res.json({ success: true, message: 'FCM Token registered successfully' });
     } catch (err) {
@@ -584,28 +600,54 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
 
         const hostUser = hostQuery.rows[0];
         const gateName = gateQuery.rows.length > 0 ? gateQuery.rows[0].name : 'Main Security Gate';
+        const guardName = req.user.name || 'Security Officer';
 
-        const title = `🚨 URGENT: Visitor Arrival - ${visitorName.trim()}`;
-        const body = `${visitorName.trim()} (${visitorCompany || 'Visitor'}) has arrived at ${gateName} for "${purpose.trim()}". Please Accept or Decline.`;
-        const dataPayload = {
+        const callPayload = {
+            type: 'INCOMING_VISITOR_CALL',
             requestId: String(newRequestId),
+            callId: `CALL_${newRequestId}_${Date.now()}`,
             visitorName: visitorName.trim(),
             visitorMobile: visitorMobile.trim(),
-            visitorCompany: visitorCompany || 'Guest Visitor',
+            visitorCompany: visitorCompany ? visitorCompany.trim() : 'Guest Visitor',
             purpose: purpose.trim(),
             gateName,
-            guardName: req.user.name || 'Security Officer',
-            type: 'VISITOR_REQUEST',
-            urgent: 'true',
-            channelId: 'vms_visitor_alerts'
+            guardName,
+            gateId: String(gateId || 1),
+            hostEmployeeId: String(hostEmployeeId),
+            hostName: hostUser ? hostUser.full_name : 'Host Employee',
+            idProofType: idProofType || 'National ID',
+            idProofNumber: idProofNumber ? idProofNumber.trim() : '',
+            vehicleNumber: vehicleNumber ? vehicleNumber.trim() : '',
+            createdAt: new Date(createdAt).toISOString(),
+            urgent: 'true'
         };
 
-        if (hostUser && hostUser.fcm_token) {
-            await sendPushNotification(hostUser.fcm_token, title, body, dataPayload);
+        // Query all registered FCM tokens for the host employee
+        const tokenQuery = await pgPool.query(`
+            SELECT DISTINCT fcm_token FROM (
+                SELECT fcm_token FROM user_fcm_tokens WHERE user_id = $1 AND fcm_token IS NOT NULL
+                UNION
+                SELECT fcm_token FROM users WHERE id = $1 AND fcm_token IS NOT NULL
+            ) t
+        `, [Number(hostEmployeeId)]);
+
+        const hostTokens = tokenQuery.rows.map(r => r.fcm_token).filter(Boolean);
+        console.log(`[FCM] Dispatching High-Priority Incoming Call to host ${hostEmployeeId} (${hostTokens.length} devices)`);
+
+        if (hostTokens.length > 0) {
+            await sendIncomingCallPush(hostTokens, callPayload);
         }
 
-        // Also broadcast to hosts topic
-        await sendTopicNotification('hosts', title, body, dataPayload);
+        // Store in notifications table for in-app history
+        await pgPool.query(`
+            INSERT INTO notifications (user_id, title, body, notification_type, data_payload)
+            VALUES ($1, $2, $3, 'VISITOR_REQUEST', $4)
+        `, [
+            Number(hostEmployeeId),
+            `🚨 Visitor Call: ${visitorName.trim()}`,
+            `${visitorName.trim()} (${visitorCompany || 'Visitor'}) arrived at ${gateName} for "${purpose.trim()}".`,
+            JSON.stringify(callPayload)
+        ]);
 
         await logAudit(
             req.user.id,
@@ -618,7 +660,7 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Visitor request submitted. Urgent notification transmitted to host employee.',
+            message: 'Visitor call initiated. High-priority call transmitted to host employee.',
             requestId: newRequestId,
             createdAt
         });
@@ -672,8 +714,29 @@ app.get('/api/requests', authenticateToken, async (req, res) => {
     }
 });
 
-// Employee Decision: Accept / Decline Walk-in Request
-app.put('/api/requests/:id/decision', authenticateToken, async (req, res) => {
+// Check Call Status for a Request
+app.get('/api/requests/:id/call-status', authenticateToken, async (req, res) => {
+    try {
+        const requestId = Number(req.params.id);
+        const result = await pgPool.query(`
+            SELECT id, status, decision_time as "decisionTime", decision_reason as "decisionReason",
+                   meeting_room as "meetingRoom", visitor_name as "visitorName"
+            FROM visit_requests WHERE id = $1
+        `, [requestId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Request not found' });
+        }
+
+        res.json({ success: true, request: result.rows[0] });
+    } catch (err) {
+        console.error('Call status error:', err);
+        res.status(500).json({ error: 'Failed to fetch call status' });
+    }
+});
+
+// Employee Decision Handler (Shared by PUT /api/requests/:id/decision and POST /api/employee/requests/:id/respond)
+async function handleRequestDecision(req, res) {
     try {
         const requestId = Number(req.params.id);
         const { decision, reason, meetingRoom } = req.body;
@@ -685,41 +748,90 @@ app.put('/api/requests/:id/decision', authenticateToken, async (req, res) => {
         const upperDecision = decision.toUpperCase();
         const room = meetingRoom || (upperDecision === 'ACCEPTED' ? 'Conference Room A' : null);
 
+        // Check request existence and current state
+        const existingReq = await pgPool.query(`SELECT * FROM visit_requests WHERE id = $1`, [requestId]);
+        if (existingReq.rows.length === 0) {
+            return res.status(404).json({ error: 'Visit request not found' });
+        }
+
+        const request = existingReq.rows[0];
+
+        // Authorization check: Only host employee or Admin
+        if (req.user.role !== 'ADMIN' && req.user.id !== request.host_employee_id) {
+            return res.status(403).json({ error: 'Unauthorized: Only the designated host employee can respond to this visitor request' });
+        }
+
+        // Idempotency: If already decided, return current state
+        if (request.status !== 'PENDING') {
+            return res.json({
+                success: true,
+                alreadyDecided: true,
+                status: request.status,
+                message: `Visitor request was already ${request.status.toLowerCase()}`
+            });
+        }
+
         const updateRes = await pgPool.query(`
             UPDATE visit_requests
             SET status = $1, decision_time = NOW(), decision_reason = $2, meeting_room = $3
             WHERE id = $4
-            RETURNING id, visitor_name, guard_user_id, status
+            RETURNING id, visitor_name, guard_user_id, host_employee_id, status
         `, [upperDecision, reason || null, room, requestId]);
 
-        if (updateRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Visit request not found' });
-        }
-
-        const request = updateRes.rows[0];
-        const visitorName = request.visitor_name;
+        const updatedRequest = updateRes.rows[0];
+        const visitorName = updatedRequest.visitor_name;
         const title = `Visit ${upperDecision}: ${visitorName}`;
         const body = upperDecision === 'ACCEPTED'
             ? `Host approved entry for ${visitorName}. Room: ${room || 'Assigned Office'}. You may grant entry.`
             : `Host DECLINED visit for ${visitorName}. Reason: ${reason || 'Host unavailable'}.`;
 
-        if (request.guard_user_id) {
-            const guardQuery = await pgPool.query(`SELECT fcm_token FROM users WHERE id = $1`, [request.guard_user_id]);
-            if (guardQuery.rows.length > 0 && guardQuery.rows[0].fcm_token) {
-                await sendPushNotification(guardQuery.rows[0].fcm_token, title, body, {
+        // 1. Notify Guard's devices
+        if (updatedRequest.guard_user_id) {
+            const guardTokensQuery = await pgPool.query(`
+                SELECT DISTINCT fcm_token FROM (
+                    SELECT fcm_token FROM user_fcm_tokens WHERE user_id = $1 AND fcm_token IS NOT NULL
+                    UNION
+                    SELECT fcm_token FROM users WHERE id = $1 AND fcm_token IS NOT NULL
+                ) t
+            `, [updatedRequest.guard_user_id]);
+
+            const guardTokens = guardTokensQuery.rows.map(r => r.fcm_token).filter(Boolean);
+            if (guardTokens.length > 0) {
+                await sendIncomingCallPush(guardTokens, {
+                    type: 'REQUEST_DECISION',
                     requestId: String(requestId),
                     status: upperDecision,
                     visitorName,
-                    type: 'REQUEST_DECISION'
+                    meetingRoom: room || '',
+                    reason: reason || ''
                 });
             }
         }
 
+        // 2. Broadcast to guards topic
         await sendTopicNotification('guards', title, body, {
             requestId: String(requestId),
             status: upperDecision,
             type: 'REQUEST_DECISION'
         });
+
+        // 3. Dismiss call on all of host's devices
+        const hostTokensQuery = await pgPool.query(`
+            SELECT DISTINCT fcm_token FROM (
+                SELECT fcm_token FROM user_fcm_tokens WHERE user_id = $1 AND fcm_token IS NOT NULL
+                UNION
+                SELECT fcm_token FROM users WHERE id = $1 AND fcm_token IS NOT NULL
+            ) t
+        `, [updatedRequest.host_employee_id]);
+
+        const hostTokens = hostTokensQuery.rows.map(r => r.fcm_token).filter(Boolean);
+        if (hostTokens.length > 0) {
+            await sendIncomingCallPush(hostTokens, {
+                type: 'VISITOR_CALL_DISMISSED',
+                requestId: String(requestId),
+                decision: upperDecision
+            });
+        }
 
         await logAudit(
             req.user.id,
@@ -732,13 +844,18 @@ app.put('/api/requests/:id/decision', authenticateToken, async (req, res) => {
 
         res.json({
             success: true,
+            status: upperDecision,
             message: `Visitor request has been ${upperDecision.toLowerCase()}`
         });
     } catch (err) {
         console.error('Error updating request decision:', err);
         res.status(500).json({ error: 'Database error updating visit request: ' + err.message });
     }
-});
+}
+
+// Employee Decision: Accept / Decline Walk-in Request
+app.put('/api/requests/:id/decision', authenticateToken, handleRequestDecision);
+app.post('/api/employee/requests/:id/respond', authenticateToken, handleRequestDecision);
 
 // Guard Grants Entry for Accepted Request
 app.post('/api/requests/:id/grant-entry', authenticateToken, async (req, res) => {

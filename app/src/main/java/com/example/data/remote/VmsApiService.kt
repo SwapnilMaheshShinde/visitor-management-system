@@ -132,7 +132,8 @@ data class LoginResponseDto(
 
 @JsonClass(generateAdapter = true)
 data class RegisterFcmDto(
-    @Json(name = "fcmToken") val fcmToken: String
+    @Json(name = "fcmToken") val fcmToken: String,
+    @Json(name = "deviceName") val deviceName: String? = null
 )
 
 @JsonClass(generateAdapter = true)

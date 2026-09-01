@@ -20,12 +20,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.EmployeeHostItem
 import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewWalkInScreen(
     isLoading: Boolean,
+    availableEmployees: List<EmployeeHostItem> = emptyList(),
     onSubmit: (
         visitorName: String,
         visitorMobile: String,
@@ -48,16 +50,33 @@ fun NewWalkInScreen(
     var idProofType by remember { mutableStateOf("National ID") }
     var idProofNumber by remember { mutableStateOf("") }
     var vehicleNumber by remember { mutableStateOf("") }
+    var hostSearchQuery by remember { mutableStateOf("") }
 
-    // Hosts list for selection
-    val employees = remember {
-        listOf(
-            Triple(3, "Amit Verma", "Principal Tech Lead • Tower A"),
-            Triple(4, "Priya Nair", "Head of Human Resources • Tower B")
-        )
+    // Use live employees from DB or sensible fallback if offline
+    val employeeOptions = remember(availableEmployees) {
+        if (availableEmployees.isNotEmpty()) {
+            availableEmployees.map { emp ->
+                Triple(emp.id, emp.name, "${emp.designation} • ${emp.department} (${emp.employeeCode})")
+            }
+        } else {
+            listOf(
+                Triple(3, "Amit Verma", "Principal Tech Lead • Engineering"),
+                Triple(4, "Priya Nair", "Head of Human Resources • HR Department")
+            )
+        }
     }
-    var selectedEmployeeIndex by remember { mutableIntStateOf(0) }
-    var expandedHostDropdown by remember { mutableStateOf(false) }
+
+    val filteredEmployees = remember(employeeOptions, hostSearchQuery) {
+        if (hostSearchQuery.isBlank()) employeeOptions
+        else employeeOptions.filter {
+            it.second.contains(hostSearchQuery, ignoreCase = true) ||
+            it.third.contains(hostSearchQuery, ignoreCase = true)
+        }
+    }
+
+    var selectedEmployeeId by remember(employeeOptions) {
+        mutableIntStateOf(employeeOptions.firstOrNull()?.first ?: 3)
+    }
 
     // Purpose presets
     val purposePresets = listOf(
@@ -74,7 +93,7 @@ fun NewWalkInScreen(
                 title = {
                     Column {
                         Text("Register Walk-In Visitor", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Color.White)
-                        Text("Instant Security Approval Flow", fontSize = 11.sp, color = AccentCyanGlow)
+                        Text("Incoming Call Alert Delivery", fontSize = 11.sp, color = AccentCyanGlow)
                     }
                 },
                 navigationIcon = {
@@ -97,6 +116,39 @@ fun NewWalkInScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Live Call Dispatch Banner
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF0F172A),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AccentCyanGlow.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(AccentCyanGlow.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.PhoneCallback, contentDescription = null, tint = AccentCyanGlow, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Instant Phone Call Dispatch", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(
+                            "Submitting will ring the host employee's phone with a full-screen incoming visitor call.",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+
             // Section 1: Visitor Contact & Identity
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -184,21 +236,36 @@ fun NewWalkInScreen(
                             Icon(Icons.Default.Badge, contentDescription = null, tint = StatusApprovedGreenText, modifier = Modifier.size(18.dp))
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Host Employee (Recipient)", fontWeight = FontWeight.Bold, color = DeepNavyDark, fontSize = 15.sp)
+                        Text("Host Employee (Call Recipient)", fontWeight = FontWeight.Bold, color = DeepNavyDark, fontSize = 15.sp)
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (employeeOptions.size > 2) {
+                        OutlinedTextField(
+                            value = hostSearchQuery,
+                            onValueChange = { hostSearchQuery = it },
+                            placeholder = { Text("Search host by name or department...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = DeepNavyDark) },
+                            singleLine = true,
+                            colors = vmsOutlinedTextFieldColors(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
 
                     // Host selection cards
-                    employees.forEachIndexed { index, emp ->
-                        val selected = selectedEmployeeIndex == index
+                    val displayList = if (filteredEmployees.isNotEmpty()) filteredEmployees else employeeOptions
+                    displayList.forEach { emp ->
+                        val selected = selectedEmployeeId == emp.first
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = if (selected) NavySurface else SlateLightBackground,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clickable { selectedEmployeeIndex = index }
+                                .clickable { selectedEmployeeId = emp.first }
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
@@ -206,7 +273,7 @@ fun NewWalkInScreen(
                             ) {
                                 RadioButton(
                                     selected = selected,
-                                    onClick = { selectedEmployeeIndex = index },
+                                    onClick = { selectedEmployeeId = emp.first },
                                     colors = RadioButtonDefaults.colors(selectedColor = AccentCyanGlow)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -252,68 +319,71 @@ fun NewWalkInScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Text("Purpose of Visit", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DeepNavyDark)
+                    Text("Purpose of Visit *", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DeepNavyDark)
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        purposePresets.forEach { p ->
+                            val selected = purpose == p
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (selected) AccentCyanGlow.copy(alpha = 0.15f) else SlateLightBackground,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (selected) AccentCyanGlow else Color.Transparent
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { purpose = p }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = selected,
+                                        onClick = { purpose = p },
+                                        colors = RadioButtonDefaults.colors(selectedColor = AccentCyanGlow),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = p,
+                                        fontSize = 13.sp,
+                                        color = if (selected) DeepNavyDark else SlateLightTextSecondary,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text("Government ID Proof Type", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DeepNavyDark)
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
-                        value = purpose,
-                        onValueChange = { purpose = it },
+                        value = idProofType,
+                        onValueChange = { idProofType = it },
                         singleLine = true,
                         colors = vmsOutlinedTextFieldColors(),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Preset Chips
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        SuggestionChip(
-                            onClick = { purpose = "Technical Interview" },
-                            label = { Text("Interview", fontSize = 11.sp) }
-                        )
-                        SuggestionChip(
-                            onClick = { purpose = "Official Business Meeting" },
-                            label = { Text("Meeting", fontSize = 11.sp) }
-                        )
-                        SuggestionChip(
-                            onClick = { purpose = "Vendor Delivery" },
-                            label = { Text("Delivery", fontSize = 11.sp) }
-                        )
-                    }
-
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
+                    Text("ID Proof Number / Last 4 digits", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DeepNavyDark)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = idProofNumber,
+                        onValueChange = { idProofNumber = it },
+                        placeholder = { Text("e.g. XXXX-1234") },
+                        singleLine = true,
+                        colors = vmsOutlinedTextFieldColors(),
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("ID Proof Type", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DeepNavyDark)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedTextField(
-                                value = idProofType,
-                                onValueChange = { idProofType = it },
-                                singleLine = true,
-                                colors = vmsOutlinedTextFieldColors(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("ID Number", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DeepNavyDark)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedTextField(
-                                value = idProofNumber,
-                                onValueChange = { idProofNumber = it },
-                                placeholder = { Text("e.g. DL-9812") },
-                                singleLine = true,
-                                colors = vmsOutlinedTextFieldColors(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                        }
-                    }
+                        shape = RoundedCornerShape(10.dp)
+                    )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -331,11 +401,11 @@ fun NewWalkInScreen(
                 }
             }
 
-            // Action Button: Send Request
+            // Action Button: Send Request & Ring Host Phone
             Button(
                 onClick = {
                     if (visitorName.isBlank() || visitorMobile.isBlank()) return@Button
-                    val host = employees[selectedEmployeeIndex]
+                    val selectedHost = employeeOptions.firstOrNull { it.first == selectedEmployeeId } ?: employeeOptions.first()
                     onSubmit(
                         visitorName,
                         visitorMobile,
@@ -344,10 +414,10 @@ fun NewWalkInScreen(
                         idProofType,
                         idProofNumber.ifBlank { "ID-VERIFIED" },
                         vehicleNumber.ifBlank { null },
-                        host.first,
-                        host.second,
+                        selectedHost.first,
+                        selectedHost.second,
                         1,
-                        "Main Security Gate (North)"
+                        "Main Security Gate"
                     )
                 },
                 enabled = visitorName.isNotBlank() && visitorMobile.isNotBlank() && !isLoading,
@@ -355,15 +425,15 @@ fun NewWalkInScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(54.dp)
                     .testTag("submit_walkin_request_button")
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
-                    Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.PhoneCallback, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("SEND REQUEST TO EMPLOYEE PHONE", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("INITIATE INCOMING CALL TO HOST", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
